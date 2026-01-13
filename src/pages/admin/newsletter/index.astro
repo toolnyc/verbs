@@ -1,0 +1,360 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+import { sendCampaign } from '../../../lib/resend';
+
+let subscribers: any[] = [];
+let campaigns: any[] = [];
+let activeCount = 0;
+let error = '';
+let success = '';
+
+if (supabaseAdmin) {
+  // Fetch subscribers
+  const { data: subsData, count } = await supabaseAdmin
+    .from('newsletter_subscribers')
+    .select('*', { count: 'exact' })
+    .is('unsubscribed_at', null)
+    .order('subscribed_at', { ascending: false });
+
+  subscribers = subsData || [];
+  activeCount = count || 0;
+
+  // Fetch campaigns
+  const { data: campaignsData } = await supabaseAdmin
+    .from('newsletter_campaigns')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  campaigns = campaignsData || [];
+}
+
+// Handle form submissions
+if (Astro.request.method === 'POST' && supabaseAdmin) {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'create_campaign') {
+    const { data: campaign, error: insertError } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .insert({
+        subject: formData.get('subject'),
+        html_content: formData.get('html_content'),
+        status: 'draft',
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      error = insertError.message;
+    } else {
+      success = 'Campaign created';
+    }
+  }
+
+  if (action === 'send_campaign') {
+    const campaignId = formData.get('campaign_id') as string;
+
+    // Get campaign
+    const { data: campaign } = await supabaseAdmin
+      .from('newsletter_campaigns')
+      .select('*')
+      .eq('id', campaignId)
+      .single();
+
+    if (campaign && campaign.status === 'draft') {
+      // Update status to sending
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({ status: 'sending' })
+        .eq('id', campaignId);
+
+      // Get active subscribers
+      const { data: activeSubs } = await supabaseAdmin
+        .from('newsletter_subscribers')
+        .select('email, unsubscribe_token')
+        .is('unsubscribed_at', null);
+
+      let sentCount = 0;
+      let failedCount = 0;
+
+      // Send to each subscriber
+      for (const sub of activeSubs || []) {
+        try {
+          await sendCampaign({
+            to: sub.email,
+            subject: campaign.subject,
+            htmlContent: campaign.html_content,
+            unsubscribeToken: sub.unsubscribe_token,
+          });
+          sentCount++;
+        } catch (err) {
+          console.error(`Failed to send to ${sub.email}:`, err);
+          failedCount++;
+        }
+      }
+
+      // Update campaign status
+      await supabaseAdmin
+        .from('newsletter_campaigns')
+        .update({
+          status: 'sent',
+          sent_count: sentCount,
+          failed_count: failedCount,
+          sent_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId);
+
+      success = `Campaign sent to ${sentCount} subscribers (${failedCount} failed)`;
+    }
+  }
+
+  if (action === 'delete_campaign') {
+    const campaignId = formData.get('campaign_id');
+    await supabaseAdmin.from('newsletter_campaigns').delete().eq('id', campaignId);
+    success = 'Campaign deleted';
+  }
+
+  // Refresh
+  const { data: refreshedCampaigns } = await supabaseAdmin
+    .from('newsletter_campaigns')
+    .select('*')
+    .order('created_at', { ascending: false });
+  campaigns = refreshedCampaigns || [];
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+---
+
+<Admin title="Newsletter">
+  {error && <p class="error-message mb-lg">{error}</p>}
+  {success && <p class="success-message mb-lg">{success}</p>}
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <p class="stat-label">Active Subscribers</p>
+      <p class="stat-value">{activeCount}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">Campaigns Sent</p>
+      <p class="stat-value">{campaigns.filter(c => c.status === 'sent').length}</p>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="main-content">
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Campaigns</h2>
+        </div>
+
+        {campaigns.length > 0 ? (
+          <div class="campaigns-list">
+            {campaigns.map(campaign => (
+              <div class="campaign-item">
+                <div class="campaign-info">
+                  <span class="campaign-subject">{campaign.subject}</span>
+                  <span class="campaign-date text-sm text-muted">
+                    {campaign.sent_at ? `Sent ${formatDate(campaign.sent_at)}` : `Created ${formatDate(campaign.created_at)}`}
+                  </span>
+                </div>
+                <div class="campaign-stats">
+                  {campaign.status === 'sent' && (
+                    <span class="text-sm">{campaign.sent_count} sent</span>
+                  )}
+                  <span class:list={['status-badge', campaign.status]}>
+                    {campaign.status}
+                  </span>
+                </div>
+                <div class="campaign-actions">
+                  {campaign.status === 'draft' && (
+                    <>
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action" value="send_campaign" />
+                        <input type="hidden" name="campaign_id" value={campaign.id} />
+                        <button type="submit" class="btn-sm" onclick={`return confirm('Send to ${activeCount} subscribers?')`}>
+                          Send Now
+                        </button>
+                      </form>
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action" value="delete_campaign" />
+                        <input type="hidden" name="campaign_id" value={campaign.id} />
+                        <button type="submit" class="btn-sm btn-danger">Delete</button>
+                      </form>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p class="text-muted p-lg">No campaigns yet</p>
+        )}
+      </div>
+
+      <div class="admin-card mt-xl">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Recent Subscribers</h2>
+        </div>
+
+        {subscribers.length > 0 ? (
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Source</th>
+                <th>Subscribed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subscribers.slice(0, 20).map(sub => (
+                <tr>
+                  <td>{sub.email}</td>
+                  <td class="text-muted">{sub.source || '-'}</td>
+                  <td class="text-sm text-muted">{formatDate(sub.subscribed_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p class="text-muted p-lg">No subscribers yet</p>
+        )}
+
+        {subscribers.length > 20 && (
+          <p class="text-sm text-muted p-md">Showing 20 of {activeCount} subscribers</p>
+        )}
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">New Campaign</h2>
+        </div>
+
+        <form method="POST">
+          <input type="hidden" name="action" value="create_campaign" />
+
+          <div class="form-group">
+            <label class="form-label">Subject *</label>
+            <input type="text" name="subject" required placeholder="Your newsletter subject" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Content (HTML) *</label>
+            <textarea name="html_content" rows="10" required placeholder="<p>Your newsletter content here...</p>"></textarea>
+            <p class="form-hint">Basic HTML supported. Unsubscribe link added automatically.</p>
+          </div>
+
+          <button type="submit" class="mt-md">Create Draft</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</Admin>
+
+<style>
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: var(--space-xl);
+    align-items: start;
+  }
+
+  @media (max-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      order: -1;
+    }
+  }
+
+  .campaigns-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .campaign-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .campaign-item:last-child {
+    border-bottom: none;
+  }
+
+  .campaign-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+  }
+
+  .campaign-subject {
+    font-weight: 500;
+  }
+
+  .campaign-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .campaign-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .inline-form {
+    display: inline;
+  }
+
+  .status-badge.draft {
+    background: #f0f0f0;
+    color: #666;
+  }
+
+  .status-badge.sending {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  .status-badge.sent {
+    background: #e6f4ea;
+    color: #137333;
+  }
+
+  .p-lg {
+    padding: var(--space-lg);
+  }
+
+  .p-md {
+    padding: var(--space-md);
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  .success-message {
+    background: #e6f4ea;
+    color: #137333;
+    padding: var(--space-md);
+  }
+</style>

@@ -1,0 +1,124 @@
+---
+import type { TicketTier } from '../../lib/supabase';
+
+interface Props {
+  tier: TicketTier;
+  eventId: string;
+}
+
+const { tier, eventId } = Astro.props;
+
+const available = tier.max_stock !== null ? tier.max_stock - tier.sold_count : null;
+const isSoldOut = available !== null && available <= 0;
+const isLowStock = available !== null && available > 0 && available <= 10;
+const isDoorOnly = tier.tier_type === 'door';
+
+const formattedPrice = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+}).format(tier.price);
+---
+
+<div class="tier" class:list={{ 'sold-out': isSoldOut }}>
+  <div class="tier-info">
+    <span class="tier-name">{tier.name}</span>
+    {isLowStock && !isSoldOut && (
+      <span class="low-stock">Only {available} left!</span>
+    )}
+  </div>
+
+  {isDoorOnly ? (
+    <span class="door-price">At door {formattedPrice}</span>
+  ) : isSoldOut ? (
+    <span class="badge badge-sold-out">Sold out</span>
+  ) : (
+    <button
+      class="buy-btn"
+      data-event-id={eventId}
+      data-tier-id={tier.id}
+      data-tier-name={tier.name}
+      data-price={tier.price}
+    >
+      Buy {formattedPrice}
+    </button>
+  )}
+</div>
+
+<style>
+  .tier {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    border: 1px solid var(--color-fg);
+    gap: var(--space-md);
+  }
+
+  .tier.sold-out {
+    opacity: 0.5;
+  }
+
+  .tier-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .tier-name {
+    font-weight: 500;
+  }
+
+  .low-stock {
+    font-size: var(--text-xs);
+    color: #b00;
+  }
+
+  .door-price {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .buy-btn {
+    padding: var(--space-sm) var(--space-lg);
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  // Ticket purchase handler
+  document.querySelectorAll('.buy-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const button = e.target as HTMLButtonElement;
+      const eventId = button.dataset.eventId;
+      const tierId = button.dataset.tierId;
+
+      button.disabled = true;
+      button.textContent = 'Loading...';
+
+      try {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventId,
+            ticket_tier_id: tierId,
+            quantity: 1,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.error || 'Checkout failed');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
+        button.disabled = false;
+        button.textContent = `Buy $${button.dataset.price}`;
+        alert('Something went wrong. Please try again.');
+      }
+    });
+  });
+</script>

@@ -1,0 +1,125 @@
+---
+import type { Event, TicketTier } from '../../lib/supabase';
+import TicketTierButton from './TicketTier.astro';
+
+interface Props {
+  event: Event & { ticket_tiers?: TicketTier[] };
+  compact?: boolean;
+}
+
+const { event, compact = false } = Astro.props;
+
+const eventDate = new Date(event.date);
+const isPast = eventDate < new Date();
+
+const formattedDate = eventDate.toLocaleDateString('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+
+const formattedTime = eventDate.toLocaleTimeString('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
+---
+
+<article class="event-card" class:list={{ past: isPast, compact }}>
+  <div class="event-date">
+    <span class="date text-3xl">{eventDate.getDate()}</span>
+    <span class="month text-sm text-uppercase">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+  </div>
+
+  <div class="event-details">
+    <h3 class="event-title">{event.title}</h3>
+    <p class="event-venue text-sm text-muted">
+      {event.venue_name}, {event.venue_city}
+    </p>
+    <p class="event-time text-sm">{formattedTime}</p>
+  </div>
+
+  {!compact && !isPast && tiers.length > 0 && (
+    <div class="event-tickets">
+      {tiers.slice(0, 2).map(tier => (
+        <TicketTierButton tier={tier} eventId={event.id} />
+      ))}
+    </div>
+  )}
+
+  {isPast && (
+    <div class="event-status">
+      <span class="text-xs text-muted text-uppercase">Past</span>
+    </div>
+  )}
+</article>
+
+<style>
+  .event-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-lg);
+    padding: var(--space-lg) 0;
+    border-bottom: 1px solid var(--color-border);
+    align-items: start;
+  }
+
+  .event-card.past {
+    opacity: 0.4;
+  }
+
+  .event-card.compact {
+    grid-template-columns: auto 1fr;
+  }
+
+  .event-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+  }
+
+  .date {
+    line-height: 1;
+    font-weight: 500;
+  }
+
+  .month {
+    color: var(--color-muted);
+  }
+
+  .event-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .event-title {
+    font-size: var(--text-xl);
+    font-weight: 500;
+  }
+
+  .event-tickets {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 200px;
+  }
+
+  .event-status {
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 768px) {
+    .event-card {
+      grid-template-columns: auto 1fr;
+    }
+
+    .event-tickets {
+      grid-column: 1 / -1;
+      margin-top: var(--space-md);
+    }
+  }
+</style>

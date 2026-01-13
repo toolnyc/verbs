@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+import { supabaseAdmin } from '../lib/supabase';
+
+const token = Astro.url.searchParams.get('token');
+let status: 'invalid' | 'confirm' | 'done' = 'invalid';
+let email = '';
+
+if (token && supabaseAdmin) {
+  // Look up subscriber by token
+  const { data: subscriber } = await supabaseAdmin
+    .from('newsletter_subscribers')
+    .select('id, email, unsubscribed_at')
+    .eq('unsubscribe_token', token)
+    .single();
+
+  if (subscriber) {
+    email = subscriber.email;
+
+    if (subscriber.unsubscribed_at) {
+      status = 'done';
+    } else if (Astro.request.method === 'POST') {
+      // Process unsubscribe
+      await supabaseAdmin
+        .from('newsletter_subscribers')
+        .update({ unsubscribed_at: new Date().toISOString() })
+        .eq('id', subscriber.id);
+
+      status = 'done';
+    } else {
+      status = 'confirm';
+    }
+  }
+}
+---
+
+<Base title="Unsubscribe - VERBS">
+  <main class="unsubscribe-page">
+    <div class="container">
+      <a href="/" class="back-link text-sm">&larr; Back to VERBS</a>
+
+      {status === 'invalid' && (
+        <div class="content">
+          <h1>Invalid link</h1>
+          <p class="text-muted mt-md">This unsubscribe link is invalid or has expired.</p>
+        </div>
+      )}
+
+      {status === 'confirm' && (
+        <div class="content">
+          <h1>Unsubscribe</h1>
+          <p class="mt-md">Are you sure you want to unsubscribe <strong>{email}</strong> from the VERBS newsletter?</p>
+
+          <form method="POST" class="mt-xl">
+            <button type="submit" class="secondary">Yes, unsubscribe me</button>
+          </form>
+        </div>
+      )}
+
+      {status === 'done' && (
+        <div class="content">
+          <h1>You're unsubscribed</h1>
+          <p class="text-muted mt-md">
+            {email} has been removed from our mailing list.
+          </p>
+          <p class="mt-lg">
+            <a href="/">Return to VERBS</a>
+          </p>
+        </div>
+      )}
+    </div>
+  </main>
+</Base>
+
+<style>
+  .unsubscribe-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2xl) 0;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--space-3xl);
+  }
+
+  .content {
+    max-width: 500px;
+  }
+
+  h1 {
+    font-size: var(--text-4xl);
+  }
+</style>

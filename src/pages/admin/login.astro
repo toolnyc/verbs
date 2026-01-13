@@ -1,0 +1,170 @@
+---
+import { supabaseAdmin } from '../../lib/supabase';
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  if (supabaseAdmin && email && password) {
+    const { data, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      error = authError.message;
+    } else if (data.session) {
+      // Set auth cookies
+      Astro.cookies.set('sb-access-token', data.session.access_token, {
+        path: '/',
+        httpOnly: true,
+        secure: import.meta.env.PROD,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24, // 1 day
+      });
+
+      Astro.cookies.set('sb-refresh-token', data.session.refresh_token, {
+        path: '/',
+        httpOnly: true,
+        secure: import.meta.env.PROD,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+
+      return Astro.redirect('/admin');
+    }
+  } else {
+    error = 'Please enter email and password';
+  }
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Login | VERBS Admin</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <main class="login-page">
+      <div class="login-container">
+        <div class="login-header">
+          <a href="/" class="logo">VERBS</a>
+          <span class="admin-label">Admin</span>
+        </div>
+
+        <form method="POST" class="login-form">
+          {error && <p class="error-message">{error}</p>}
+
+          <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              autocomplete="current-password"
+            />
+          </div>
+
+          <button type="submit" class="submit-btn">Log in</button>
+        </form>
+
+        <p class="back-link">
+          <a href="/">&larr; Back to site</a>
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
+
+<style>
+  @import '../../styles/global.css';
+
+  .login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+    background: var(--color-bg-alt);
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 400px;
+    background: var(--color-bg);
+    padding: var(--space-2xl);
+  }
+
+  .login-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .logo {
+    font-size: var(--text-xl);
+    font-weight: 500;
+    text-decoration: none;
+    letter-spacing: 0.1em;
+  }
+
+  .admin-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .form-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .submit-btn {
+    margin-top: var(--space-md);
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+  }
+
+  .back-link {
+    margin-top: var(--space-xl);
+    text-align: center;
+    font-size: var(--text-sm);
+  }
+</style>

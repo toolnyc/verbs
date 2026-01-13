@@ -1,0 +1,276 @@
+---
+import type { Mix } from '../../lib/supabase';
+import MixCard from './MixCard.astro';
+
+interface Props {
+  mixes: Mix[];
+}
+
+const { mixes } = Astro.props;
+---
+
+<section class="mixes-section">
+  <div class="container">
+    <h2 class="section-title">Mixes</h2>
+
+    {mixes.length > 0 ? (
+      <div class="mixes-grid">
+        {mixes.map(mix => (
+          <MixCard mix={mix} />
+        ))}
+      </div>
+    ) : (
+      <p class="no-mixes text-muted">No mixes yet</p>
+    )}
+  </div>
+</section>
+
+<!-- Global audio player -->
+<div class="audio-player" id="globalAudioPlayer" style="display: none;">
+  <audio id="audioElement"></audio>
+  <div class="player-container container">
+    <div class="player-info">
+      <span class="now-playing-title"></span>
+      <span class="now-playing-time text-xs text-muted"></span>
+    </div>
+    <div class="player-controls">
+      <button class="player-play-btn" aria-label="Play/Pause">
+        <svg class="play-icon" viewBox="0 0 24 24" width="20" height="20">
+          <polygon points="5,3 19,12 5,21" fill="currentColor" />
+        </svg>
+        <svg class="pause-icon" viewBox="0 0 24 24" width="20" height="20" style="display: none;">
+          <rect x="5" y="3" width="4" height="18" fill="currentColor" />
+          <rect x="15" y="3" width="4" height="18" fill="currentColor" />
+        </svg>
+      </button>
+      <input type="range" class="progress" min="0" max="100" value="0" />
+      <button class="player-close-btn" aria-label="Close">×</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .mixes-section {
+    padding: var(--space-3xl) 0;
+    background: var(--color-bg-alt);
+  }
+
+  .section-title {
+    font-size: var(--text-5xl);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .mixes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-lg);
+  }
+
+  .no-mixes {
+    padding: var(--space-2xl) 0;
+  }
+
+  /* Global audio player bar */
+  .audio-player {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--color-fg);
+    color: var(--color-bg);
+    padding: var(--space-md) 0;
+    z-index: 1000;
+  }
+
+  .player-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+  }
+
+  .player-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .now-playing-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .now-playing-time {
+    opacity: 0.7;
+  }
+
+  .player-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-shrink: 0;
+  }
+
+  .player-play-btn {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+  }
+
+  .progress {
+    width: 120px;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.3);
+    height: 4px;
+    border-radius: 2px;
+    border: none;
+    padding: 0;
+  }
+
+  .progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--color-bg);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .player-close-btn {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: var(--text-xl);
+    padding: var(--space-sm);
+    opacity: 0.7;
+  }
+
+  .player-close-btn:hover {
+    opacity: 1;
+    background: transparent;
+    color: inherit;
+  }
+
+  .audio-player.playing .player-play-btn .play-icon {
+    display: none;
+  }
+
+  .audio-player.playing .player-play-btn .pause-icon {
+    display: block;
+  }
+
+  @media (max-width: 480px) {
+    .progress {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  // Audio player controller
+  const audioElement = document.getElementById('audioElement') as HTMLAudioElement;
+  const playerEl = document.getElementById('globalAudioPlayer')!;
+  const titleEl = playerEl.querySelector('.now-playing-title')!;
+  const timeEl = playerEl.querySelector('.now-playing-time')!;
+  const progressEl = playerEl.querySelector('.progress') as HTMLInputElement;
+  const playerPlayBtn = playerEl.querySelector('.player-play-btn')!;
+  const closeBtn = playerEl.querySelector('.player-close-btn')!;
+
+  let currentMixCard: HTMLElement | null = null;
+
+  function formatTime(seconds: number) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function updatePlayerUI() {
+    const isPlaying = !audioElement.paused;
+    playerEl.classList.toggle('playing', isPlaying);
+
+    if (currentMixCard) {
+      document.querySelectorAll('.mix-card').forEach(card => {
+        card.classList.remove('playing');
+      });
+      if (isPlaying) {
+        currentMixCard.classList.add('playing');
+      }
+    }
+  }
+
+  function playMix(card: HTMLElement) {
+    const audioUrl = card.dataset.audioUrl;
+    const title = card.querySelector('.mix-title')?.textContent || 'Unknown';
+
+    if (currentMixCard === card && !audioElement.paused) {
+      audioElement.pause();
+      updatePlayerUI();
+      return;
+    }
+
+    if (currentMixCard !== card) {
+      currentMixCard = card;
+      audioElement.src = audioUrl!;
+      titleEl.textContent = title;
+    }
+
+    playerEl.style.display = 'block';
+    audioElement.play();
+    updatePlayerUI();
+  }
+
+  // Mix card click handlers
+  document.querySelectorAll('.mix-card').forEach(card => {
+    const playBtn = card.querySelector('.play-btn');
+    playBtn?.addEventListener('click', () => playMix(card as HTMLElement));
+  });
+
+  // Player controls
+  playerPlayBtn.addEventListener('click', () => {
+    if (audioElement.paused) {
+      audioElement.play();
+    } else {
+      audioElement.pause();
+    }
+    updatePlayerUI();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    audioElement.pause();
+    audioElement.src = '';
+    playerEl.style.display = 'none';
+    currentMixCard?.classList.remove('playing');
+    currentMixCard = null;
+  });
+
+  // Progress updates
+  audioElement.addEventListener('timeupdate', () => {
+    const current = formatTime(audioElement.currentTime);
+    const duration = formatTime(audioElement.duration || 0);
+    timeEl.textContent = `${current} / ${duration}`;
+
+    const percent = (audioElement.currentTime / audioElement.duration) * 100;
+    progressEl.value = String(percent || 0);
+  });
+
+  audioElement.addEventListener('play', updatePlayerUI);
+  audioElement.addEventListener('pause', updatePlayerUI);
+  audioElement.addEventListener('ended', () => {
+    updatePlayerUI();
+    currentMixCard?.classList.remove('playing');
+  });
+
+  progressEl.addEventListener('input', () => {
+    const percent = Number(progressEl.value);
+    audioElement.currentTime = (percent / 100) * audioElement.duration;
+  });
+</script>

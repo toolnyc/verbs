@@ -1,0 +1,183 @@
+---
+interface Props {
+  name: string;
+  type: 'image' | 'audio';
+  currentUrl?: string;
+  label: string;
+  accept?: string;
+}
+
+const { name, type, currentUrl, label, accept } = Astro.props;
+
+const acceptTypes = accept || (type === 'image'
+  ? 'image/jpeg,image/png,image/webp'
+  : 'audio/mpeg,audio/aiff,audio/wav');
+
+const inputId = `upload-${name}`;
+---
+
+<div class="file-upload" data-type={type}>
+  <label class="form-label">{label}</label>
+
+  <div class="upload-area">
+    {type === 'image' && currentUrl && (
+      <div class="preview image-preview">
+        <img src={currentUrl} alt="Current" />
+      </div>
+    )}
+
+    {type === 'audio' && currentUrl && (
+      <div class="preview audio-preview">
+        <audio controls src={currentUrl}></audio>
+      </div>
+    )}
+
+    <div class="upload-controls">
+      <input
+        type="file"
+        id={inputId}
+        accept={acceptTypes}
+        class="file-input"
+      />
+      <label for={inputId} class="upload-btn secondary">
+        {currentUrl ? 'Replace' : 'Choose File'}
+      </label>
+      <span class="upload-status"></span>
+    </div>
+
+    <input type="hidden" name={name} value={currentUrl || ''} class="url-input" />
+  </div>
+
+  <p class="form-hint">
+    {type === 'image' ? 'jpg, png, webp up to 5MB' : 'mp3, aiff, wav'}
+  </p>
+</div>
+
+<style>
+  .file-upload {
+    margin-bottom: var(--space-lg);
+  }
+
+  .upload-area {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .preview {
+    max-width: 200px;
+  }
+
+  .image-preview img {
+    width: 100%;
+    height: auto;
+  }
+
+  .audio-preview audio {
+    width: 100%;
+  }
+
+  .upload-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .file-input {
+    display: none;
+  }
+
+  .upload-btn {
+    cursor: pointer;
+    display: inline-block;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-fg);
+    background: transparent;
+    font-size: var(--text-sm);
+  }
+
+  .upload-btn:hover {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .upload-status {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .upload-status.uploading {
+    color: var(--color-fg);
+  }
+
+  .upload-status.success {
+    color: #137333;
+  }
+
+  .upload-status.error {
+    color: #c5221f;
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.file-upload').forEach(container => {
+    const fileInput = container.querySelector('.file-input') as HTMLInputElement;
+    const urlInput = container.querySelector('.url-input') as HTMLInputElement;
+    const status = container.querySelector('.upload-status') as HTMLElement;
+    const uploadType = container.dataset.type;
+
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      status.textContent = 'Uploading...';
+      status.className = 'upload-status uploading';
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', uploadType || 'image');
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.url) {
+          urlInput.value = data.url;
+          status.textContent = 'Uploaded!';
+          status.className = 'upload-status success';
+
+          // Update preview
+          const preview = container.querySelector('.preview');
+          if (uploadType === 'image') {
+            if (preview) {
+              (preview.querySelector('img') as HTMLImageElement).src = data.url;
+            } else {
+              const newPreview = document.createElement('div');
+              newPreview.className = 'preview image-preview';
+              newPreview.innerHTML = `<img src="${data.url}" alt="Uploaded" />`;
+              container.querySelector('.upload-area')?.prepend(newPreview);
+            }
+          } else if (uploadType === 'audio') {
+            if (preview) {
+              (preview.querySelector('audio') as HTMLAudioElement).src = data.url;
+            } else {
+              const newPreview = document.createElement('div');
+              newPreview.className = 'preview audio-preview';
+              newPreview.innerHTML = `<audio controls src="${data.url}"></audio>`;
+              container.querySelector('.upload-area')?.prepend(newPreview);
+            }
+          }
+        } else {
+          throw new Error(data.error || 'Upload failed');
+        }
+      } catch (err: any) {
+        status.textContent = err.message || 'Upload failed';
+        status.className = 'upload-status error';
+      }
+    });
+  });
+</script>

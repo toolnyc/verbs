@@ -1,0 +1,126 @@
+---
+import type { Mix } from '../../lib/supabase';
+
+interface Props {
+  mix: Mix;
+}
+
+const { mix } = Astro.props;
+
+const formatDuration = (seconds: number | null) => {
+  if (!seconds) return '';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+---
+
+<article class="mix-card" data-audio-url={mix.audio_url}>
+  {mix.cover_image_url ? (
+    <img src={mix.cover_image_url} alt={mix.title} class="cover" />
+  ) : (
+    <div class="cover cover-placeholder">
+      <span class="text-4xl">♫</span>
+    </div>
+  )}
+
+  <div class="mix-info">
+    <h3 class="mix-title">{mix.title}</h3>
+    {mix.description && (
+      <p class="mix-description text-sm text-muted">{mix.description}</p>
+    )}
+    {mix.duration_seconds && (
+      <p class="mix-duration text-xs text-muted">{formatDuration(mix.duration_seconds)}</p>
+    )}
+  </div>
+
+  <button class="play-btn" aria-label="Play">
+    <svg class="play-icon" viewBox="0 0 24 24" width="24" height="24">
+      <polygon points="5,3 19,12 5,21" fill="currentColor" />
+    </svg>
+    <svg class="pause-icon" viewBox="0 0 24 24" width="24" height="24" style="display: none;">
+      <rect x="5" y="3" width="4" height="18" fill="currentColor" />
+      <rect x="15" y="3" width="4" height="18" fill="currentColor" />
+    </svg>
+  </button>
+</article>
+
+<style>
+  .mix-card {
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid var(--color-border);
+    align-items: center;
+  }
+
+  .cover {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+  }
+
+  .cover-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-alt);
+    color: var(--color-muted);
+  }
+
+  .mix-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+  }
+
+  .mix-title {
+    font-size: var(--text-lg);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mix-description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .play-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .play-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .mix-card.playing .play-icon {
+    display: none;
+  }
+
+  .mix-card.playing .pause-icon {
+    display: block;
+  }
+
+  @media (max-width: 480px) {
+    .mix-card {
+      grid-template-columns: 60px 1fr auto;
+    }
+
+    .cover {
+      width: 60px;
+      height: 60px;
+    }
+  }
+</style>

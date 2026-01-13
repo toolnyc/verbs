@@ -1,0 +1,492 @@
+---
+import Admin from '../../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../../lib/supabase';
+import { createProductAndPrice, updatePrice } from '../../../../lib/stripe';
+
+const { id } = Astro.params;
+
+let event: any = null;
+let tiers: any[] = [];
+let eventDjs: any[] = [];
+let allDjs: any[] = [];
+let error = '';
+let success = '';
+
+if (supabaseAdmin && id) {
+  // Fetch event
+  const { data: eventData } = await supabaseAdmin
+    .from('events')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  event = eventData;
+
+  // Fetch tiers
+  const { data: tiersData } = await supabaseAdmin
+    .from('ticket_tiers')
+    .select('*')
+    .eq('event_id', id)
+    .order('sort_order');
+
+  tiers = tiersData || [];
+
+  // Fetch event DJs
+  const { data: djsData } = await supabaseAdmin
+    .from('event_djs')
+    .select('*, dj:djs(*)')
+    .eq('event_id', id)
+    .order('sort_order');
+
+  eventDjs = djsData || [];
+
+  // Fetch all DJs for selector
+  const { data: allDjsData } = await supabaseAdmin
+    .from('djs')
+    .select('*')
+    .order('name');
+
+  allDjs = allDjsData || [];
+}
+
+// Handle form submissions
+if (Astro.request.method === 'POST' && supabaseAdmin && event) {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'update_event') {
+    const { error: updateError } = await supabaseAdmin
+      .from('events')
+      .update({
+        title: formData.get('title'),
+        description: formData.get('description') || null,
+        date: formData.get('date'),
+        time_end: formData.get('time_end') || null,
+        venue_name: formData.get('venue_name'),
+        venue_city: formData.get('venue_city'),
+        venue_link: formData.get('venue_link') || null,
+        status: formData.get('status'),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      error = updateError.message;
+    } else {
+      success = 'Event updated';
+      // Refresh event data
+      const { data: refreshed } = await supabaseAdmin.from('events').select('*').eq('id', id).single();
+      event = refreshed;
+    }
+  }
+
+  if (action === 'add_tier') {
+    const tierData: any = {
+      event_id: id,
+      name: formData.get('tier_name'),
+      tier_type: formData.get('tier_type'),
+      price: parseFloat(formData.get('tier_price') as string),
+      max_stock: formData.get('tier_max_stock') ? parseInt(formData.get('tier_max_stock') as string) : null,
+      is_active: true,
+      sort_order: tiers.length,
+    };
+
+    // Create Stripe product and price for online tiers
+    if (tierData.tier_type === 'online') {
+      try {
+        const { productId, priceId } = await createProductAndPrice({
+          eventTitle: event.title,
+          tierName: tierData.name,
+          price: tierData.price,
+        });
+        tierData.stripe_product_id = productId;
+        tierData.stripe_price_id = priceId;
+      } catch (stripeErr: any) {
+        error = `Stripe error: ${stripeErr.message}`;
+      }
+    }
+
+    if (!error) {
+      const { error: tierError } = await supabaseAdmin.from('ticket_tiers').insert(tierData);
+      if (tierError) {
+        error = tierError.message;
+      } else {
+        success = 'Ticket tier added';
+      }
+    }
+
+    // Refresh tiers
+    const { data: refreshedTiers } = await supabaseAdmin
+      .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+    tiers = refreshedTiers || [];
+  }
+
+  if (action === 'delete_tier') {
+    const tierId = formData.get('tier_id');
+    await supabaseAdmin.from('ticket_tiers').delete().eq('id', tierId);
+    success = 'Tier deleted';
+
+    const { data: refreshedTiers } = await supabaseAdmin
+      .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+    tiers = refreshedTiers || [];
+  }
+
+  if (action === 'toggle_tier') {
+    const tierId = formData.get('tier_id');
+    const isActive = formData.get('is_active') === 'true';
+    await supabaseAdmin.from('ticket_tiers').update({ is_active: !isActive }).eq('id', tierId);
+
+    const { data: refreshedTiers } = await supabaseAdmin
+      .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+    tiers = refreshedTiers || [];
+  }
+
+  if (action === 'add_dj') {
+    const djId = formData.get('dj_id');
+    const newDjName = formData.get('new_dj_name');
+
+    let targetDjId = djId;
+
+    // Create new DJ if specified
+    if (newDjName) {
+      const { data: newDj } = await supabaseAdmin
+        .from('djs')
+        .insert({ name: newDjName })
+        .select()
+        .single();
+
+      if (newDj) {
+        targetDjId = newDj.id;
+      }
+    }
+
+    if (targetDjId) {
+      await supabaseAdmin.from('event_djs').insert({
+        event_id: id,
+        dj_id: targetDjId,
+        sort_order: eventDjs.length,
+      });
+
+      // Refresh
+      const { data: refreshedDjs } = await supabaseAdmin
+        .from('event_djs').select('*, dj:djs(*)').eq('event_id', id).order('sort_order');
+      eventDjs = refreshedDjs || [];
+
+      const { data: refreshedAllDjs } = await supabaseAdmin.from('djs').select('*').order('name');
+      allDjs = refreshedAllDjs || [];
+    }
+  }
+
+  if (action === 'remove_dj') {
+    const eventDjId = formData.get('event_dj_id');
+    await supabaseAdmin.from('event_djs').delete().eq('id', eventDjId);
+
+    const { data: refreshedDjs } = await supabaseAdmin
+      .from('event_djs').select('*, dj:djs(*)').eq('event_id', id).order('sort_order');
+    eventDjs = refreshedDjs || [];
+  }
+}
+
+if (!event) {
+  return Astro.redirect('/admin/events');
+}
+
+function formatDateForInput(date: string) {
+  return new Date(date).toISOString().slice(0, 16);
+}
+
+const assignedDjIds = new Set(eventDjs.map(ed => ed.dj_id));
+const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
+---
+
+<Admin title={`Edit: ${event.title}`}>
+  {error && <p class="error-message mb-lg">{error}</p>}
+  {success && <p class="success-message mb-lg">{success}</p>}
+
+  <div class="edit-grid">
+    <div class="edit-main">
+      <form method="POST" class="admin-form">
+        <input type="hidden" name="action" value="update_event" />
+
+        <div class="form-group">
+          <label for="title" class="form-label">Event Title *</label>
+          <input type="text" id="title" name="title" value={event.title} required />
+        </div>
+
+        <div class="form-group">
+          <label for="description" class="form-label">Description</label>
+          <textarea id="description" name="description" rows="4">{event.description}</textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="date" class="form-label">Start Date & Time *</label>
+            <input type="datetime-local" id="date" name="date" value={formatDateForInput(event.date)} required />
+          </div>
+
+          <div class="form-group">
+            <label for="time_end" class="form-label">End Time</label>
+            <input type="datetime-local" id="time_end" name="time_end" value={event.time_end ? formatDateForInput(event.time_end) : ''} />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="venue_name" class="form-label">Venue Name *</label>
+            <input type="text" id="venue_name" name="venue_name" value={event.venue_name} required />
+          </div>
+
+          <div class="form-group">
+            <label for="venue_city" class="form-label">City *</label>
+            <input type="text" id="venue_city" name="venue_city" value={event.venue_city} required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="venue_link" class="form-label">Venue Link</label>
+          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} />
+        </div>
+
+        <div class="form-group">
+          <label for="status" class="form-label">Status</label>
+          <select id="status" name="status">
+            <option value="draft" selected={event.status === 'draft'}>Draft</option>
+            <option value="published" selected={event.status === 'published'}>Published</option>
+            <option value="archived" selected={event.status === 'archived'}>Archived</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <a href="/admin/events" class="secondary">Back to Events</a>
+          <button type="submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="edit-sidebar">
+      <!-- Ticket Tiers -->
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Ticket Tiers</h2>
+        </div>
+
+        {tiers.length > 0 && (
+          <div class="tiers-list">
+            {tiers.map(tier => (
+              <div class:list={['tier-item', { inactive: !tier.is_active }]}>
+                <div class="tier-info">
+                  <span class="tier-name">{tier.name}</span>
+                  <span class="tier-price">${tier.price}</span>
+                  <span class="tier-type text-xs text-muted">{tier.tier_type}</span>
+                </div>
+                <div class="tier-stats">
+                  <span class="text-sm">{tier.sold_count} / {tier.max_stock || '∞'}</span>
+                </div>
+                <div class="tier-actions">
+                  <form method="POST" class="inline-form">
+                    <input type="hidden" name="action" value="toggle_tier" />
+                    <input type="hidden" name="tier_id" value={tier.id} />
+                    <input type="hidden" name="is_active" value={tier.is_active} />
+                    <button type="submit" class="btn-sm secondary">
+                      {tier.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                  </form>
+                  {tier.sold_count === 0 && (
+                    <form method="POST" class="inline-form">
+                      <input type="hidden" name="action" value="delete_tier" />
+                      <input type="hidden" name="tier_id" value={tier.id} />
+                      <button type="submit" class="btn-sm btn-danger">Delete</button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form method="POST" class="add-tier-form">
+          <input type="hidden" name="action" value="add_tier" />
+          <h4 class="text-sm mt-lg mb-sm">Add Tier</h4>
+          <div class="tier-form-grid">
+            <input type="text" name="tier_name" placeholder="Name" required />
+            <input type="number" name="tier_price" placeholder="Price" step="0.01" min="0" required />
+            <input type="number" name="tier_max_stock" placeholder="Stock (blank=unlimited)" min="0" />
+            <select name="tier_type">
+              <option value="online">Online</option>
+              <option value="door">Door only</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-sm mt-sm">Add Tier</button>
+        </form>
+      </div>
+
+      <!-- DJs -->
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Lineup</h2>
+        </div>
+
+        {eventDjs.length > 0 && (
+          <div class="djs-list">
+            {eventDjs.map(ed => (
+              <div class="dj-item">
+                <span class="dj-name">{ed.dj?.name}</span>
+                <form method="POST" class="inline-form">
+                  <input type="hidden" name="action" value="remove_dj" />
+                  <input type="hidden" name="event_dj_id" value={ed.id} />
+                  <button type="submit" class="btn-sm secondary">Remove</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form method="POST" class="add-dj-form">
+          <input type="hidden" name="action" value="add_dj" />
+          <h4 class="text-sm mt-lg mb-sm">Add DJ</h4>
+          {availableDjs.length > 0 && (
+            <select name="dj_id" class="mb-sm">
+              <option value="">Select existing DJ...</option>
+              {availableDjs.map(dj => (
+                <option value={dj.id}>{dj.name}</option>
+              ))}
+            </select>
+          )}
+          <input type="text" name="new_dj_name" placeholder="Or create new DJ..." class="mb-sm" />
+          <button type="submit" class="btn-sm">Add to Lineup</button>
+        </form>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Quick Actions</h2>
+        </div>
+        <div class="quick-actions">
+          <a href={`/admin/events/${id}/orders`} class="action-link">View Orders →</a>
+          {event.status === 'published' && (
+            <a href="/" target="_blank" class="action-link">View on Site →</a>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+</Admin>
+
+<style>
+  .edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: var(--space-xl);
+    align-items: start;
+  }
+
+  @media (max-width: 1024px) {
+    .edit-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .edit-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  .success-message {
+    background: #e6f4ea;
+    color: #137333;
+    padding: var(--space-md);
+  }
+
+  .tiers-list,
+  .djs-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .tier-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-sm);
+    align-items: center;
+    padding: var(--space-sm);
+    background: var(--color-bg-alt);
+  }
+
+  .tier-item.inactive {
+    opacity: 0.5;
+  }
+
+  .tier-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .tier-name {
+    font-weight: 500;
+  }
+
+  .tier-actions {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .dj-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-sm);
+    background: var(--color-bg-alt);
+  }
+
+  .dj-name {
+    font-weight: 500;
+  }
+
+  .inline-form {
+    display: inline;
+  }
+
+  .tier-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+
+  .add-tier-form,
+  .add-dj-form {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .action-link {
+    font-size: var(--text-sm);
+  }
+</style>

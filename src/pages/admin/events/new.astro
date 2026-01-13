@@ -1,0 +1,113 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+
+let error = '';
+
+if (Astro.request.method === 'POST' && supabaseAdmin) {
+  const formData = await Astro.request.formData();
+
+  const eventData = {
+    title: formData.get('title') as string,
+    description: formData.get('description') as string || null,
+    date: formData.get('date') as string,
+    time_end: formData.get('time_end') as string || null,
+    venue_name: formData.get('venue_name') as string,
+    venue_city: formData.get('venue_city') as string,
+    venue_link: formData.get('venue_link') as string || null,
+    status: formData.get('status') as string || 'draft',
+  };
+
+  const { data, error: insertError } = await supabaseAdmin
+    .from('events')
+    .insert(eventData)
+    .select()
+    .single();
+
+  if (insertError) {
+    error = insertError.message;
+  } else if (data) {
+    return Astro.redirect(`/admin/events/${data.id}`);
+  }
+}
+---
+
+<Admin title="New Event">
+  <form method="POST" class="admin-form">
+    {error && <p class="error-message mb-lg">{error}</p>}
+
+    <div class="form-group">
+      <label for="title" class="form-label">Event Title *</label>
+      <input type="text" id="title" name="title" required />
+    </div>
+
+    <div class="form-group">
+      <label for="description" class="form-label">Description</label>
+      <textarea id="description" name="description" rows="4"></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="date" class="form-label">Start Date & Time *</label>
+        <input type="datetime-local" id="date" name="date" required />
+      </div>
+
+      <div class="form-group">
+        <label for="time_end" class="form-label">End Time</label>
+        <input type="datetime-local" id="time_end" name="time_end" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="venue_name" class="form-label">Venue Name *</label>
+        <input type="text" id="venue_name" name="venue_name" required />
+      </div>
+
+      <div class="form-group">
+        <label for="venue_city" class="form-label">City *</label>
+        <input type="text" id="venue_city" name="venue_city" required />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="venue_link" class="form-label">Venue Link (Google Maps, etc.)</label>
+      <input type="url" id="venue_link" name="venue_link" placeholder="https://" />
+    </div>
+
+    <div class="form-group">
+      <label for="status" class="form-label">Status</label>
+      <select id="status" name="status">
+        <option value="draft">Draft</option>
+        <option value="published">Published</option>
+      </select>
+      <p class="form-hint">Draft events are not visible to the public</p>
+    </div>
+
+    <div class="form-actions">
+      <a href="/admin/events" class="secondary">Cancel</a>
+      <button type="submit">Create Event</button>
+    </div>
+  </form>
+</Admin>
+
+<style>
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+  }
+</style>

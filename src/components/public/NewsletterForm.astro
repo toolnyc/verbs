@@ -1,0 +1,131 @@
+---
+// Newsletter signup form
+---
+
+<section class="newsletter">
+  <div class="container">
+    <div class="newsletter-content">
+      <h2 class="newsletter-title">Stay in the loop</h2>
+      <p class="newsletter-text text-muted">Get notified about upcoming events and new mixes.</p>
+
+      <form class="newsletter-form" id="newsletterForm">
+        <div class="form-row">
+          <input
+            type="email"
+            name="email"
+            placeholder="your@email.com"
+            required
+            autocomplete="email"
+            class="email-input"
+          />
+          <button type="submit" class="submit-btn">Subscribe</button>
+        </div>
+        <p class="form-message" id="formMessage"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<style>
+  .newsletter {
+    padding: var(--space-4xl) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .newsletter-content {
+    max-width: 500px;
+  }
+
+  .newsletter-title {
+    font-size: var(--text-4xl);
+    margin-bottom: var(--space-sm);
+  }
+
+  .newsletter-text {
+    margin-bottom: var(--space-xl);
+  }
+
+  .newsletter-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .form-row {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .email-input {
+    flex: 1;
+  }
+
+  .submit-btn {
+    white-space: nowrap;
+  }
+
+  .form-message {
+    font-size: var(--text-sm);
+    min-height: 1.5em;
+  }
+
+  .form-message.success {
+    color: #080;
+  }
+
+  .form-message.error {
+    color: #b00;
+  }
+
+  @media (max-width: 480px) {
+    .form-row {
+      flex-direction: column;
+    }
+
+    .submit-btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  const form = document.getElementById('newsletterForm') as HTMLFormElement;
+  const message = document.getElementById('formMessage')!;
+  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const email = formData.get('email') as string;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Subscribing...';
+    message.textContent = '';
+    message.className = 'form-message';
+
+    try {
+      const response = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        message.textContent = 'You\'re subscribed!';
+        message.className = 'form-message success';
+        form.reset();
+      } else {
+        throw new Error(data.error || 'Subscription failed');
+      }
+    } catch (err: any) {
+      message.textContent = err.message || 'Something went wrong. Please try again.';
+      message.className = 'form-message error';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Subscribe';
+    }
+  });
+</script>

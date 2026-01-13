@@ -1,0 +1,265 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+
+const status = Astro.url.searchParams.get('status') || 'all';
+
+let events: any[] = [];
+
+if (supabaseAdmin) {
+  let query = supabaseAdmin
+    .from('events')
+    .select('*, ticket_tiers(*)')
+    .order('date', { ascending: false });
+
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+
+  const { data } = await query;
+  events = data || [];
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function getTicketStats(event: any) {
+  const tiers = event.ticket_tiers || [];
+  const activeTiers = tiers.filter((t: any) => t.is_active);
+  const totalSold = activeTiers.reduce((sum: number, t: any) => sum + t.sold_count, 0);
+  const totalStock = activeTiers.reduce((sum: number, t: any) => sum + (t.max_stock || 0), 0);
+  const hasUnlimited = activeTiers.some((t: any) => t.max_stock === null);
+
+  return { totalSold, totalStock, hasUnlimited };
+}
+
+const filters = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'published', label: 'Published' },
+  { value: 'archived', label: 'Archived' },
+];
+---
+
+<Admin title="Events">
+  <div class="page-actions">
+    <div class="filters">
+      {filters.map(f => (
+        <a
+          href={`/admin/events${f.value === 'all' ? '' : `?status=${f.value}`}`}
+          class:list={['filter-btn', { active: status === f.value }]}
+        >
+          {f.label}
+        </a>
+      ))}
+    </div>
+    <a href="/admin/events/new" class="btn-primary">New Event</a>
+  </div>
+
+  {events.length > 0 ? (
+    <div class="events-list">
+      {events.map(event => {
+        const stats = getTicketStats(event);
+        const isPast = new Date(event.date) < new Date();
+
+        return (
+          <div class:list={['event-row', { past: isPast }]}>
+            <div class="event-date">
+              <span class="day">{new Date(event.date).getDate()}</span>
+              <span class="month">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+              <span class="year">{new Date(event.date).getFullYear()}</span>
+            </div>
+
+            <div class="event-info">
+              <h3 class="event-title">
+                <a href={`/admin/events/${event.id}`}>{event.title}</a>
+              </h3>
+              <p class="event-venue text-sm text-muted">
+                {event.venue_name}, {event.venue_city}
+              </p>
+            </div>
+
+            <div class="event-stats">
+              <span class="tickets-sold">
+                {stats.totalSold} sold
+                {!stats.hasUnlimited && stats.totalStock > 0 && ` / ${stats.totalStock}`}
+              </span>
+            </div>
+
+            <div class="event-status">
+              <span class:list={['status-badge', event.status]}>
+                {event.status}
+              </span>
+            </div>
+
+            <div class="event-actions">
+              <a href={`/admin/events/${event.id}`} class="btn-sm secondary">Edit</a>
+              <a href={`/admin/events/${event.id}/orders`} class="btn-sm secondary">Orders</a>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <div class="empty-state">
+      <p class="text-muted">No events found</p>
+      <a href="/admin/events/new" class="mt-md">Create your first event</a>
+    </div>
+  )}
+</Admin>
+
+<style>
+  .page-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .filters {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .filter-btn {
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--text-sm);
+    text-decoration: none;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+  }
+
+  .filter-btn:hover {
+    background: var(--color-bg-alt);
+  }
+
+  .filter-btn.active {
+    background: var(--color-fg);
+    color: var(--color-bg);
+    border-color: var(--color-fg);
+  }
+
+  .btn-primary {
+    display: inline-block;
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--color-fg);
+    color: var(--color-bg);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .events-list {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg);
+  }
+
+  .event-row {
+    display: grid;
+    grid-template-columns: 80px 1fr auto auto auto;
+    gap: var(--space-lg);
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .event-row:last-child {
+    border-bottom: none;
+  }
+
+  .event-row.past {
+    opacity: 0.5;
+  }
+
+  .event-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .day {
+    font-size: var(--text-2xl);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .month {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .year {
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+  }
+
+  .event-info {
+    min-width: 0;
+  }
+
+  .event-title {
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
+
+  .event-title a {
+    text-decoration: none;
+  }
+
+  .event-title a:hover {
+    text-decoration: underline;
+  }
+
+  .event-stats {
+    text-align: right;
+  }
+
+  .tickets-sold {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .event-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .empty-state {
+    background: var(--color-bg);
+    padding: var(--space-3xl);
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .event-row {
+      grid-template-columns: 60px 1fr;
+      grid-template-rows: auto auto;
+    }
+
+    .event-stats,
+    .event-status,
+    .event-actions {
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    .event-actions {
+      grid-column: 1 / -1;
+      margin-top: var(--space-sm);
+    }
+  }
+</style>

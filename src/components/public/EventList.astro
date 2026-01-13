@@ -1,0 +1,90 @@
+---
+import type { Event, TicketTier } from '../../lib/supabase';
+import EventCard from './EventCard.astro';
+
+interface Props {
+  events: (Event & { ticket_tiers?: TicketTier[] })[];
+  excludeId?: string;
+}
+
+const { events, excludeId } = Astro.props;
+
+// Filter out the excluded event (hero event) and group by year/month
+const filteredEvents = excludeId
+  ? events.filter(e => e.id !== excludeId)
+  : events;
+
+// Group events by year
+const eventsByYear = filteredEvents.reduce((acc, event) => {
+  const year = new Date(event.date).getFullYear();
+  if (!acc[year]) acc[year] = [];
+  acc[year].push(event);
+  return acc;
+}, {} as Record<number, typeof filteredEvents>);
+
+// Sort years descending for past, ascending for future
+const currentYear = new Date().getFullYear();
+const years = Object.keys(eventsByYear)
+  .map(Number)
+  .sort((a, b) => {
+    // Future years first (ascending), then past years (descending)
+    const aIsFuture = a >= currentYear;
+    const bIsFuture = b >= currentYear;
+    if (aIsFuture && !bIsFuture) return -1;
+    if (!aIsFuture && bIsFuture) return 1;
+    if (aIsFuture) return a - b;
+    return b - a;
+  });
+---
+
+<section class="events-list">
+  <div class="container">
+    <h2 class="section-title">All Events</h2>
+
+    {years.map(year => (
+      <div class="year-group">
+        <h3 class="year-header">{year}</h3>
+        <div class="events">
+          {eventsByYear[year].map(event => (
+            <EventCard event={event} />
+          ))}
+        </div>
+      </div>
+    ))}
+
+    {filteredEvents.length === 0 && (
+      <p class="no-events text-muted">No events to show</p>
+    )}
+  </div>
+</section>
+
+<style>
+  .events-list {
+    padding: var(--space-3xl) 0;
+  }
+
+  .section-title {
+    font-size: var(--text-5xl);
+    margin-bottom: var(--space-3xl);
+  }
+
+  .year-group {
+    margin-bottom: var(--space-3xl);
+  }
+
+  .year-header {
+    font-size: var(--text-6xl);
+    color: var(--color-muted);
+    margin-bottom: var(--space-lg);
+    opacity: 0.3;
+  }
+
+  .events {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .no-events {
+    padding: var(--space-2xl) 0;
+  }
+</style>
