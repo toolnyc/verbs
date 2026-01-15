@@ -1,0 +1,63 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+
+let error = '';
+
+if (Astro.request.method === 'POST' && supabaseAdmin) {
+  const formData = await Astro.request.formData();
+
+  const djData = {
+    name: formData.get('name') as string,
+    instagram_url: formData.get('instagram_url') as string || null,
+    soundcloud_url: formData.get('soundcloud_url') as string || null,
+  };
+
+  const { data, error: insertError } = await supabaseAdmin
+    .from('djs')
+    .insert(djData)
+    .select()
+    .single();
+
+  if (insertError) {
+    error = insertError.message;
+  } else if (data) {
+    return Astro.redirect('/admin/djs');
+  }
+}
+---
+
+<Admin title="New DJ">
+  <form method="POST" class="admin-form">
+    {error && <p class="error-message mb-lg">{error}</p>}
+
+    <div class="form-group">
+      <label for="name" class="form-label">Name *</label>
+      <input type="text" id="name" name="name" required />
+    </div>
+
+    <div class="form-group">
+      <label for="instagram_url" class="form-label">Instagram URL</label>
+      <input type="url" id="instagram_url" name="instagram_url" placeholder="https://instagram.com/..." />
+    </div>
+
+    <div class="form-group">
+      <label for="soundcloud_url" class="form-label">SoundCloud URL</label>
+      <input type="url" id="soundcloud_url" name="soundcloud_url" placeholder="https://soundcloud.com/..." />
+    </div>
+
+    <div class="form-actions">
+      <a href="/admin/djs" class="secondary">Cancel</a>
+      <button type="submit">Create DJ</button>
+    </div>
+  </form>
+</Admin>
+
+<style>
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+  }
+</style>

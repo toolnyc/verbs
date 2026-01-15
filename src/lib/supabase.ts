@@ -167,6 +167,25 @@ export async function getPublishedEvents() {
   return data || [];
 }
 
+// Get all events (published and draft) for homepage verb grid
+export async function getAllEvents() {
+  const { data, error } = await supabase
+    .from('events')
+    .select(`
+      *,
+      ticket_tiers (*)
+    `)
+    .in('status', ['published', 'draft'])
+    .order('date', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
 // Get published mixes
 export async function getPublishedMixes() {
   const { data, error } = await supabase

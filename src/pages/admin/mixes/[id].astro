@@ -1,0 +1,179 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+import FileUpload from '../../../components/admin/FileUpload.astro';
+
+const { id } = Astro.params;
+
+let mix: any = null;
+let error = '';
+let success = '';
+
+if (supabaseAdmin && id) {
+  const { data } = await supabaseAdmin
+    .from('mixes')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!data) {
+    return Astro.redirect('/admin/mixes');
+  }
+
+  mix = data;
+}
+
+// Handle form submissions
+if (Astro.request.method === 'POST' && supabaseAdmin && id) {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'update') {
+    const { error: updateError } = await supabaseAdmin
+      .from('mixes')
+      .update({
+        title: formData.get('title'),
+        description: formData.get('description') || null,
+        audio_url: formData.get('audio_url'),
+        cover_image_url: formData.get('cover_image_url') || null,
+        duration_seconds: formData.get('duration_seconds') ? parseInt(formData.get('duration_seconds') as string) : null,
+        status: formData.get('status'),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      error = updateError.message;
+    } else {
+      success = 'Mix updated';
+      // Refresh data
+      const { data } = await supabaseAdmin
+        .from('mixes')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (data) mix = data;
+    }
+  }
+
+  if (action === 'delete') {
+    const { error: deleteError } = await supabaseAdmin.from('mixes').delete().eq('id', id);
+
+    if (deleteError) {
+      error = deleteError.message;
+    } else {
+      return Astro.redirect('/admin/mixes');
+    }
+  }
+}
+
+function formatDuration(seconds: number | null) {
+  if (!seconds) return '--:--';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+---
+
+<Admin title={`Edit: ${mix?.title || 'Mix'}`}>
+  {error && <p class="error-message mb-lg">{error}</p>}
+  {success && <p class="success-message mb-lg">{success}</p>}
+
+  {mix && (
+    <form method="POST" class="admin-form">
+      <input type="hidden" name="action" value="update" />
+
+      <div class="form-group">
+        <label for="title" class="form-label">Title *</label>
+        <input type="text" id="title" name="title" value={mix.title} required />
+      </div>
+
+      <div class="form-group">
+        <label for="description" class="form-label">Description</label>
+        <textarea id="description" name="description" rows="4">{mix.description}</textarea>
+      </div>
+
+      <div class="form-group">
+        <FileUpload
+          name="audio_url"
+          type="audio"
+          label="Audio File *"
+          currentUrl={mix.audio_url}
+          accept="audio/mpeg,audio/mp3,audio/wav,audio/aiff"
+        />
+      </div>
+
+      <div class="form-group">
+        <FileUpload
+          name="cover_image_url"
+          type="image"
+          label="Cover Image"
+          currentUrl={mix.cover_image_url}
+          accept="image/jpeg,image/png,image/webp"
+        />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="duration_seconds" class="form-label">Duration (seconds)</label>
+          <input type="number" id="duration_seconds" name="duration_seconds" value={mix.duration_seconds || ''} min="0" />
+          <p class="form-hint">Current: {formatDuration(mix.duration_seconds)}</p>
+        </div>
+
+        <div class="form-group">
+          <label for="status" class="form-label">Status</label>
+          <select id="status" name="status">
+            <option value="draft" selected={mix.status === 'draft'}>Draft</option>
+            <option value="published" selected={mix.status === 'published'}>Published</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a href="/admin/mixes" class="secondary">Back to Mixes</a>
+        <button type="submit">Save Changes</button>
+      </div>
+    </form>
+
+    <div class="danger-zone">
+      <form method="POST">
+        <input type="hidden" name="action" value="delete" />
+        <button type="submit" class="btn-danger" onclick="return confirm('Delete this mix? This cannot be undone.')">
+          Delete Mix
+        </button>
+      </form>
+    </div>
+  )}
+</Admin>
+
+<style>
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .danger-zone {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  .success-message {
+    background: #e6f4ea;
+    color: #137333;
+    padding: var(--space-md);
+  }
+</style>

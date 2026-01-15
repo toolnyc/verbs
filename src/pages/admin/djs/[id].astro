@@ -1,0 +1,127 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+
+const { id } = Astro.params;
+
+let dj: any = null;
+let error = '';
+let success = '';
+
+if (supabaseAdmin && id) {
+  const { data } = await supabaseAdmin
+    .from('djs')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!data) {
+    return Astro.redirect('/admin/djs');
+  }
+
+  dj = data;
+}
+
+// Handle form submissions
+if (Astro.request.method === 'POST' && supabaseAdmin && id) {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'update') {
+    const { error: updateError } = await supabaseAdmin
+      .from('djs')
+      .update({
+        name: formData.get('name'),
+        instagram_url: formData.get('instagram_url') || null,
+        soundcloud_url: formData.get('soundcloud_url') || null,
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      error = updateError.message;
+    } else {
+      success = 'DJ updated';
+      // Refresh data
+      const { data } = await supabaseAdmin
+        .from('djs')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (data) dj = data;
+    }
+  }
+
+  if (action === 'delete') {
+    const { error: deleteError } = await supabaseAdmin
+      .from('djs')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      error = deleteError.message;
+    } else {
+      return Astro.redirect('/admin/djs');
+    }
+  }
+}
+---
+
+<Admin title={`Edit: ${dj?.name || 'DJ'}`}>
+  {error && <p class="error-message mb-lg">{error}</p>}
+  {success && <p class="success-message mb-lg">{success}</p>}
+
+  {dj && (
+    <form method="POST" class="admin-form">
+      <input type="hidden" name="action" value="update" />
+
+      <div class="form-group">
+        <label for="name" class="form-label">Name *</label>
+        <input type="text" id="name" name="name" value={dj.name} required />
+      </div>
+
+      <div class="form-group">
+        <label for="instagram_url" class="form-label">Instagram URL</label>
+        <input type="url" id="instagram_url" name="instagram_url" value={dj.instagram_url || ''} placeholder="https://instagram.com/..." />
+      </div>
+
+      <div class="form-group">
+        <label for="soundcloud_url" class="form-label">SoundCloud URL</label>
+        <input type="url" id="soundcloud_url" name="soundcloud_url" value={dj.soundcloud_url || ''} placeholder="https://soundcloud.com/..." />
+      </div>
+
+      <div class="form-actions">
+        <a href="/admin/djs" class="secondary">Back to DJs</a>
+        <button type="submit">Save Changes</button>
+      </div>
+    </form>
+
+    <div class="danger-zone">
+      <form method="POST">
+        <input type="hidden" name="action" value="delete" />
+        <button type="submit" class="btn-danger" onclick="return confirm('Delete this DJ? This cannot be undone.')">
+          Delete DJ
+        </button>
+      </form>
+    </div>
+  )}
+</Admin>
+
+<style>
+  .danger-zone {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  .success-message {
+    background: #e6f4ea;
+    color: #137333;
+    padding: var(--space-md);
+  }
+</style>

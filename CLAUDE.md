@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm run dev      # Start dev server at localhost:4321
-pnpm run build    # Build for production
-pnpm run preview  # Preview production build
+pnpm run dev       # Start dev server + Stripe webhooks (auto-injects secret)
+pnpm run dev:only  # Start dev server only (no Stripe)
+pnpm run build     # Build for production
+pnpm run preview   # Preview production build
 ```
 
 ### Database (Supabase CLI)

@@ -1,5 +1,6 @@
 ---
 import { Font } from 'astro:assets';
+import '../styles/global.css';
 
 interface Props {
   title?: string;
@@ -33,6 +34,3 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
   </body>
 </html>
 
-<style is:global>
-  @import '../styles/global.css';
-</style>

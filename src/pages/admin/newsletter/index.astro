@@ -4,7 +4,6 @@ import { supabaseAdmin } from '../../../lib/supabase';
 import { sendCampaign } from '../../../lib/resend';
 
 let subscribers: any[] = [];
-let campaigns: any[] = [];
 let activeCount = 0;
 let error = '';
 let success = '';
@@ -19,108 +18,48 @@ if (supabaseAdmin) {
 
   subscribers = subsData || [];
   activeCount = count || 0;
-
-  // Fetch campaigns
-  const { data: campaignsData } = await supabaseAdmin
-    .from('newsletter_campaigns')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  campaigns = campaignsData || [];
 }
 
-// Handle form submissions
+// Handle form submission - send email blast
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
-  const action = formData.get('action');
+  const subject = formData.get('subject') as string;
+  const content = formData.get('content') as string;
 
-  if (action === 'create_campaign') {
-    const { data: campaign, error: insertError } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .insert({
-        subject: formData.get('subject'),
-        html_content: formData.get('html_content'),
-        status: 'draft',
-      })
-      .select()
-      .single();
+  if (!subject || !content) {
+    error = 'Subject and content are required';
+  } else {
+    // Get active subscribers
+    const { data: activeSubs } = await supabaseAdmin
+      .from('newsletter_subscribers')
+      .select('email, unsubscribe_token')
+      .is('unsubscribed_at', null);
 
-    if (insertError) {
-      error = insertError.message;
-    } else {
-      success = 'Campaign created';
-    }
-  }
+    let sentCount = 0;
+    let failedCount = 0;
 
-  if (action === 'send_campaign') {
-    const campaignId = formData.get('campaign_id') as string;
-
-    // Get campaign
-    const { data: campaign } = await supabaseAdmin
-      .from('newsletter_campaigns')
-      .select('*')
-      .eq('id', campaignId)
-      .single();
-
-    if (campaign && campaign.status === 'draft') {
-      // Update status to sending
-      await supabaseAdmin
-        .from('newsletter_campaigns')
-        .update({ status: 'sending' })
-        .eq('id', campaignId);
-
-      // Get active subscribers
-      const { data: activeSubs } = await supabaseAdmin
-        .from('newsletter_subscribers')
-        .select('email, unsubscribe_token')
-        .is('unsubscribed_at', null);
-
-      let sentCount = 0;
-      let failedCount = 0;
-
-      // Send to each subscriber
-      for (const sub of activeSubs || []) {
-        try {
-          await sendCampaign({
-            to: sub.email,
-            subject: campaign.subject,
-            htmlContent: campaign.html_content,
-            unsubscribeToken: sub.unsubscribe_token,
-          });
-          sentCount++;
-        } catch (err) {
-          console.error(`Failed to send to ${sub.email}:`, err);
-          failedCount++;
-        }
+    // Send to each subscriber
+    for (const sub of activeSubs || []) {
+      try {
+        await sendCampaign({
+          to: sub.email,
+          subject: subject,
+          htmlContent: content,
+          unsubscribeToken: sub.unsubscribe_token,
+        });
+        sentCount++;
+      } catch (err) {
+        console.error(`Failed to send to ${sub.email}:`, err);
+        failedCount++;
       }
+    }
 
-      // Update campaign status
-      await supabaseAdmin
-        .from('newsletter_campaigns')
-        .update({
-          status: 'sent',
-          sent_count: sentCount,
-          failed_count: failedCount,
-          sent_at: new Date().toISOString(),
-        })
-        .eq('id', campaignId);
-
-      success = `Campaign sent to ${sentCount} subscribers (${failedCount} failed)`;
+    if (sentCount > 0) {
+      success = `Email sent to ${sentCount} subscriber${sentCount !== 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''}`;
+    } else {
+      error = 'Failed to send emails';
     }
   }
-
-  if (action === 'delete_campaign') {
-    const campaignId = formData.get('campaign_id');
-    await supabaseAdmin.from('newsletter_campaigns').delete().eq('id', campaignId);
-    success = 'Campaign deleted';
-  }
-
-  // Refresh
-  const { data: refreshedCampaigns } = await supabaseAdmin
-    .from('newsletter_campaigns')
-    .select('*')
-    .order('created_at', { ascending: false });
-  campaigns = refreshedCampaigns || [];
 }
 
 function formatDate(date: string) {
@@ -128,134 +67,67 @@ function formatDate(date: string) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
   });
 }
 ---
 
-<Admin title="Newsletter">
+<Admin title="Email">
   {error && <p class="error-message mb-lg">{error}</p>}
   {success && <p class="success-message mb-lg">{success}</p>}
 
-  <div class="stats-grid">
-    <div class="stat-card">
-      <p class="stat-label">Active Subscribers</p>
-      <p class="stat-value">{activeCount}</p>
-    </div>
-    <div class="stat-card">
-      <p class="stat-label">Campaigns Sent</p>
-      <p class="stat-value">{campaigns.filter(c => c.status === 'sent').length}</p>
-    </div>
-  </div>
-
   <div class="content-grid">
-    <div class="main-content">
+    <div class="compose-section">
       <div class="admin-card">
         <div class="admin-card-header">
-          <h2 class="admin-card-title">Campaigns</h2>
+          <h2 class="admin-card-title">Send Email</h2>
+          <span class="subscriber-count">{activeCount} subscriber{activeCount !== 1 ? 's' : ''}</span>
         </div>
 
-        {campaigns.length > 0 ? (
-          <div class="campaigns-list">
-            {campaigns.map(campaign => (
-              <div class="campaign-item">
-                <div class="campaign-info">
-                  <span class="campaign-subject">{campaign.subject}</span>
-                  <span class="campaign-date text-sm text-muted">
-                    {campaign.sent_at ? `Sent ${formatDate(campaign.sent_at)}` : `Created ${formatDate(campaign.created_at)}`}
-                  </span>
-                </div>
-                <div class="campaign-stats">
-                  {campaign.status === 'sent' && (
-                    <span class="text-sm">{campaign.sent_count} sent</span>
-                  )}
-                  <span class:list={['status-badge', campaign.status]}>
-                    {campaign.status}
-                  </span>
-                </div>
-                <div class="campaign-actions">
-                  {campaign.status === 'draft' && (
-                    <>
-                      <form method="POST" class="inline-form">
-                        <input type="hidden" name="action" value="send_campaign" />
-                        <input type="hidden" name="campaign_id" value={campaign.id} />
-                        <button type="submit" class="btn-sm" onclick={`return confirm('Send to ${activeCount} subscribers?')`}>
-                          Send Now
-                        </button>
-                      </form>
-                      <form method="POST" class="inline-form">
-                        <input type="hidden" name="action" value="delete_campaign" />
-                        <input type="hidden" name="campaign_id" value={campaign.id} />
-                        <button type="submit" class="btn-sm btn-danger">Delete</button>
-                      </form>
-                    </>
-                  )}
-                </div>
+        <form method="POST" class="compose-form">
+          <div class="form-group">
+            <label class="form-label">Subject</label>
+            <input type="text" name="subject" required placeholder="Your email subject" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Content</label>
+            <textarea name="content" rows="12" required placeholder="Write your email content here...
+
+You can use basic HTML tags like <p>, <a>, <strong>, etc."></textarea>
+            <p class="form-hint">Unsubscribe link is added automatically.</p>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" onclick={`return confirm('Send this email to ${activeCount} subscribers?')`}>
+              Send to All Subscribers
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="subscribers-section">
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 class="admin-card-title">Subscribers</h2>
+        </div>
+
+        {subscribers.length > 0 ? (
+          <div class="subscribers-list">
+            {subscribers.slice(0, 20).map(sub => (
+              <div class="subscriber-item">
+                <span class="subscriber-email">{sub.email}</span>
+                <span class="subscriber-date text-muted">{formatDate(sub.subscribed_at)}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p class="text-muted p-lg">No campaigns yet</p>
-        )}
-      </div>
-
-      <div class="admin-card mt-xl">
-        <div class="admin-card-header">
-          <h2 class="admin-card-title">Recent Subscribers</h2>
-        </div>
-
-        {subscribers.length > 0 ? (
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Source</th>
-                <th>Subscribed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subscribers.slice(0, 20).map(sub => (
-                <tr>
-                  <td>{sub.email}</td>
-                  <td class="text-muted">{sub.source || '-'}</td>
-                  <td class="text-sm text-muted">{formatDate(sub.subscribed_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p class="text-muted p-lg">No subscribers yet</p>
+          <p class="text-muted text-sm">No subscribers yet</p>
         )}
 
         {subscribers.length > 20 && (
-          <p class="text-sm text-muted p-md">Showing 20 of {activeCount} subscribers</p>
+          <p class="text-sm text-muted mt-md">+ {activeCount - 20} more</p>
         )}
-      </div>
-    </div>
-
-    <div class="sidebar">
-      <div class="admin-card">
-        <div class="admin-card-header">
-          <h2 class="admin-card-title">New Campaign</h2>
-        </div>
-
-        <form method="POST">
-          <input type="hidden" name="action" value="create_campaign" />
-
-          <div class="form-group">
-            <label class="form-label">Subject *</label>
-            <input type="text" name="subject" required placeholder="Your newsletter subject" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Content (HTML) *</label>
-            <textarea name="html_content" rows="10" required placeholder="<p>Your newsletter content here...</p>"></textarea>
-            <p class="form-hint">Basic HTML supported. Unsubscribe link added automatically.</p>
-          </div>
-
-          <button type="submit" class="mt-md">Create Draft</button>
-        </form>
       </div>
     </div>
   </div>
@@ -264,7 +136,7 @@ function formatDate(date: string) {
 <style>
   .content-grid {
     display: grid;
-    grid-template-columns: 1fr 400px;
+    grid-template-columns: 1fr 350px;
     gap: var(--space-xl);
     align-items: start;
   }
@@ -273,77 +145,47 @@ function formatDate(date: string) {
     .content-grid {
       grid-template-columns: 1fr;
     }
-
-    .sidebar {
-      order: -1;
-    }
   }
 
-  .campaigns-list {
+  .subscriber-count {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .compose-form textarea {
+    font-family: inherit;
+    resize: vertical;
+    min-height: 200px;
+  }
+
+  .form-actions {
+    margin-top: var(--space-lg);
+  }
+
+  .subscribers-list {
     display: flex;
     flex-direction: column;
   }
 
-  .campaign-item {
+  .subscriber-item {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: var(--space-lg);
-    padding: var(--space-lg);
+    padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-sm);
   }
 
-  .campaign-item:last-child {
+  .subscriber-item:last-child {
     border-bottom: none;
   }
 
-  .campaign-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    min-width: 0;
-  }
-
-  .campaign-subject {
+  .subscriber-email {
     font-weight: 500;
   }
 
-  .campaign-stats {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-  }
-
-  .campaign-actions {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .inline-form {
-    display: inline;
-  }
-
-  .status-badge.draft {
-    background: #f0f0f0;
-    color: #666;
-  }
-
-  .status-badge.sending {
-    background: #fff3cd;
-    color: #856404;
-  }
-
-  .status-badge.sent {
-    background: #e6f4ea;
-    color: #137333;
-  }
-
-  .p-lg {
-    padding: var(--space-lg);
-  }
-
-  .p-md {
-    padding: var(--space-md);
+  .subscriber-date {
+    font-size: var(--text-xs);
   }
 
   .error-message {

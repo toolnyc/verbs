@@ -1,0 +1,109 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+import FileUpload from '../../../components/admin/FileUpload.astro';
+
+let error = '';
+
+if (Astro.request.method === 'POST' && supabaseAdmin) {
+  const formData = await Astro.request.formData();
+
+  const mixData = {
+    title: formData.get('title') as string,
+    description: formData.get('description') as string || null,
+    audio_url: formData.get('audio_url') as string,
+    cover_image_url: formData.get('cover_image_url') as string || null,
+    duration_seconds: formData.get('duration_seconds') ? parseInt(formData.get('duration_seconds') as string) : null,
+    status: formData.get('status') as string || 'draft',
+  };
+
+  const { data, error: insertError } = await supabaseAdmin
+    .from('mixes')
+    .insert(mixData)
+    .select()
+    .single();
+
+  if (insertError) {
+    error = insertError.message;
+  } else if (data) {
+    return Astro.redirect('/admin/mixes');
+  }
+}
+---
+
+<Admin title="New Mix">
+  <form method="POST" class="admin-form">
+    {error && <p class="error-message mb-lg">{error}</p>}
+
+    <div class="form-group">
+      <label for="title" class="form-label">Title *</label>
+      <input type="text" id="title" name="title" required />
+    </div>
+
+    <div class="form-group">
+      <label for="description" class="form-label">Description</label>
+      <textarea id="description" name="description" rows="4"></textarea>
+    </div>
+
+    <div class="form-group">
+      <FileUpload
+        name="audio_url"
+        type="audio"
+        label="Audio File *"
+        accept="audio/mpeg,audio/mp3,audio/wav,audio/aiff"
+      />
+    </div>
+
+    <div class="form-group">
+      <FileUpload
+        name="cover_image_url"
+        type="image"
+        label="Cover Image"
+        accept="image/jpeg,image/png,image/webp"
+      />
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="duration_seconds" class="form-label">Duration (seconds)</label>
+        <input type="number" id="duration_seconds" name="duration_seconds" min="0" placeholder="e.g. 3600" />
+        <p class="form-hint">Optional - enter duration in seconds</p>
+      </div>
+
+      <div class="form-group">
+        <label for="status" class="form-label">Status</label>
+        <select id="status" name="status">
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+        <p class="form-hint">Draft mixes are not visible to the public</p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="/admin/mixes" class="secondary">Cancel</a>
+      <button type="submit">Create Mix</button>
+    </div>
+  </form>
+</Admin>
+
+<style>
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+  }
+</style>

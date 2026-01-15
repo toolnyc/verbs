@@ -1,0 +1,292 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getEventWithDetails } from '../../lib/supabase';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/');
+}
+
+const { event, tiers, djs } = await getEventWithDetails(id);
+
+// Check if user is authenticated
+const user = Astro.locals.user;
+
+// Published events: visible to everyone
+// Draft events: visible only to authenticated users
+// Archived events: not visible on public pages
+const canView = event && (
+  event.status === 'published' ||
+  (event.status === 'draft' && user)
+);
+
+if (!canView) {
+  return Astro.redirect('/');
+}
+
+const isDraft = event.status === 'draft';
+
+const eventDate = new Date(event.date);
+const isPast = eventDate < new Date();
+
+const formattedDate = eventDate.toLocaleDateString('en-US', {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
+
+const formattedTime = eventDate.toLocaleTimeString('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+const formattedYear = eventDate.getFullYear();
+---
+
+<Base title={`${event.title} - VERBS`} description={event.description || `${event.title} at ${event.venue_name}`}>
+  <main class="event-page">
+    {isDraft && (
+      <div class="draft-banner">
+        Draft &mdash; Only visible to logged in users
+      </div>
+    )}
+    <a href="/" class="back-link no-underline">&larr; Back</a>
+
+    <div class="event-layout">
+      <div class="event-image-wrapper img-hover-reveal">
+        {event.image_url && (
+          <img src={event.image_url} alt={event.title} class="event-image" />
+        )}
+      </div>
+
+      <div class="event-details">
+        <header class="event-header">
+          <div class="event-meta">
+            <span class="date-pill">{formattedDate}</span>
+            <span class="year-pill">{formattedYear}</span>
+          </div>
+          <h1 class="event-title display-text">{event.title}</h1>
+        </header>
+
+        <div class="event-info">
+          <div class="venue">
+            <p class="venue-name">{event.venue_name}</p>
+            <p class="venue-city text-muted">{event.venue_city}</p>
+            {event.venue_link && (
+              <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">
+                View map &rarr;
+              </a>
+            )}
+          </div>
+
+          <div class="time">
+            <p class="time-main">{formattedTime}</p>
+            {event.time_end && (
+              <p class="text-muted text-sm">
+                &mdash; {new Date(event.time_end).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </p>
+            )}
+          </div>
+
+          {djs.length > 0 && (
+            <div class="lineup">
+              <p class="text-uppercase text-xs text-muted mb-sm">Lineup</p>
+              <ul class="dj-list">
+                {djs.map(dj => (
+                  <li class="dj-name">{dj.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {event.description && (
+            <div class="description">
+              <p>{event.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container flex justify-between items-center">
+        <a href="/" class="footer-logo no-underline">VERBS</a>
+        <p class="text-sm text-muted">&copy; {new Date().getFullYear()}</p>
+      </div>
+    </footer>
+  </main>
+</Base>
+
+<style>
+  .event-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .draft-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-fg);
+    color: var(--color-bg);
+    text-align: center;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+  }
+
+  .back-link {
+    position: fixed;
+    top: var(--space-lg);
+    left: var(--space-lg);
+    z-index: 100;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-fg);
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .back-link:hover {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .event-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100vh;
+  }
+
+  .event-image-wrapper {
+    position: relative;
+    min-height: 100%;
+  }
+
+  .event-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .event-details {
+    padding: var(--space-4xl);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .event-header {
+    margin-bottom: var(--space-3xl);
+  }
+
+  .event-meta {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .date-pill,
+  .year-pill {
+    display: inline-block;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--color-fg);
+  }
+
+  .event-title {
+    font-size: var(--text-6xl);
+  }
+
+  .event-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  .venue-name {
+    font-size: var(--text-2xl);
+    font-weight: 500;
+  }
+
+  .venue-link {
+    display: inline-block;
+    margin-top: var(--space-xs);
+  }
+
+  .time-main {
+    font-size: var(--text-xl);
+  }
+
+  .dj-list {
+    list-style: none;
+  }
+
+  .dj-name {
+    font-size: var(--text-lg);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .dj-name:last-child {
+    border-bottom: none;
+  }
+
+  .description {
+    max-width: 45ch;
+    line-height: 1.6;
+  }
+
+  .site-footer {
+    padding: var(--space-xl) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .footer-logo {
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
+
+  @media (max-width: 1024px) {
+    .event-title {
+      font-size: var(--text-5xl);
+    }
+
+    .event-details {
+      padding: var(--space-2xl);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .event-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .event-image-wrapper {
+      height: 50vh;
+      min-height: auto;
+    }
+
+    .back-link {
+      position: absolute;
+    }
+
+    .event-details {
+      padding: var(--space-xl);
+    }
+
+    .event-title {
+      font-size: var(--text-4xl);
+    }
+  }
+</style>

@@ -2,69 +2,12 @@
 import Admin from '../../layouts/Admin.astro';
 import { supabaseAdmin } from '../../lib/supabase';
 
-// Fetch dashboard stats
-let stats = {
-  totalRevenue: 0,
-  ticketsSold: 0,
-  subscribers: 0,
-  upcomingEvents: 0,
-};
-
+let currentEvent: any = null;
 let recentOrders: any[] = [];
 let lowStockTiers: any[] = [];
-let nextEvent: any = null;
 
 if (supabaseAdmin) {
-  // Total revenue and tickets sold
-  const { data: orders } = await supabaseAdmin
-    .from('orders')
-    .select('amount_paid, quantity, refunded_amount')
-    .eq('status', 'completed');
-
-  if (orders) {
-    stats.totalRevenue = orders.reduce((sum, o) => sum + (o.amount_paid - (o.refunded_amount || 0)), 0);
-    stats.ticketsSold = orders.reduce((sum, o) => sum + o.quantity, 0);
-  }
-
-  // Subscribers count
-  const { count: subCount } = await supabaseAdmin
-    .from('newsletter_subscribers')
-    .select('*', { count: 'exact', head: true })
-    .is('unsubscribed_at', null);
-
-  stats.subscribers = subCount || 0;
-
-  // Upcoming events count
-  const { count: eventCount } = await supabaseAdmin
-    .from('events')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'published')
-    .gte('date', new Date().toISOString());
-
-  stats.upcomingEvents = eventCount || 0;
-
-  // Recent orders
-  const { data: recent } = await supabaseAdmin
-    .from('orders')
-    .select('*, event:events(title), tier:ticket_tiers(name)')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  recentOrders = recent || [];
-
-  // Low stock tiers (< 10 remaining)
-  const { data: tiers } = await supabaseAdmin
-    .from('ticket_tiers')
-    .select('*, event:events(title, date)')
-    .eq('is_active', true)
-    .not('max_stock', 'is', null);
-
-  lowStockTiers = (tiers || []).filter(t => {
-    const available = t.max_stock - t.sold_count;
-    return available > 0 && available <= 10;
-  });
-
-  // Next event
+  // Get the next upcoming published event (current event)
   const { data: upcoming } = await supabaseAdmin
     .from('events')
     .select('*, ticket_tiers(*)')
@@ -74,7 +17,31 @@ if (supabaseAdmin) {
     .limit(1)
     .single();
 
-  nextEvent = upcoming;
+  currentEvent = upcoming;
+
+  // Recent orders for current event
+  if (currentEvent) {
+    const { data: eventOrders } = await supabaseAdmin
+      .from('orders')
+      .select('*, tier:ticket_tiers(name)')
+      .eq('event_id', currentEvent.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    recentOrders = eventOrders || [];
+
+    // Low stock tiers for current event (exclude door tiers)
+    lowStockTiers = (currentEvent.ticket_tiers || []).filter((t: any) => {
+      if (!t.is_active || !t.max_stock || t.tier_type === 'door') return false;
+      const available = t.max_stock - t.sold_count;
+      return available > 0 && available <= 10;
+    });
+  }
+}
+
+// Filter to only online tiers (exclude door)
+function getOnlineTiers(tiers: any[]) {
+  return tiers.filter((t: any) => t.is_active && t.tier_type !== 'door');
 }
 
 function formatCurrency(amount: number) {
@@ -86,177 +53,279 @@ function formatCurrency(amount: number) {
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('en-US', {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
 }
+
+function getTotalSold(tiers: any[]) {
+  return tiers.reduce((sum, t) => sum + (t.sold_count || 0), 0);
+}
+
+function getTotalRevenue(orders: any[]) {
+  return orders.reduce((sum, o) => sum + (o.amount_paid - (o.refunded_amount || 0)), 0);
+}
 ---
 
-<Admin title="Dashboard">
-  <div class="stats-grid">
-    <div class="stat-card">
-      <p class="stat-label">Total Revenue</p>
-      <p class="stat-value">{formatCurrency(stats.totalRevenue)}</p>
-    </div>
-    <div class="stat-card">
-      <p class="stat-label">Tickets Sold</p>
-      <p class="stat-value">{stats.ticketsSold}</p>
-    </div>
-    <div class="stat-card">
-      <p class="stat-label">Subscribers</p>
-      <p class="stat-value">{stats.subscribers}</p>
-    </div>
-    <div class="stat-card">
-      <p class="stat-label">Upcoming Events</p>
-      <p class="stat-value">{stats.upcomingEvents}</p>
-    </div>
-  </div>
-
-  <div class="dashboard-grid">
-    <div class="dashboard-col">
-      {nextEvent && (
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h2 class="admin-card-title">Next Event</h2>
-            <a href={`/admin/events/${nextEvent.id}`} class="text-sm">Edit</a>
-          </div>
-          <div class="next-event">
-            <h3 class="text-xl">{nextEvent.title}</h3>
-            <p class="text-muted text-sm">{formatDate(nextEvent.date)}</p>
-            <p class="text-sm mt-sm">{nextEvent.venue_name}, {nextEvent.venue_city}</p>
-
-            {nextEvent.ticket_tiers && (
-              <div class="tier-stats mt-lg">
-                {nextEvent.ticket_tiers.filter((t: any) => t.is_active).map((tier: any) => (
-                  <div class="tier-stat">
-                    <span class="tier-name">{tier.name}</span>
-                    <span class="tier-sold">
-                      {tier.sold_count} / {tier.max_stock || '∞'} sold
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+<Admin title="Home">
+  {currentEvent ? (
+    <div class="current-event-hero">
+      <div class="event-header">
+        <div class="event-info">
+          <h2 class="event-title">{currentEvent.title}</h2>
+          <p class="event-meta">
+            {formatDate(currentEvent.date)} · {currentEvent.venue_name}, {currentEvent.venue_city}
+          </p>
         </div>
-      )}
+        <div class="event-actions">
+          <a href={`/admin/events/${currentEvent.id}`} class="btn-primary">Edit Event</a>
+          <a href={`/admin/events/${currentEvent.id}/orders`} class="btn-secondary">View Orders</a>
+        </div>
+      </div>
 
       {lowStockTiers.length > 0 && (
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <h2 class="admin-card-title">Low Stock Warnings</h2>
-          </div>
-          <div class="warnings">
-            {lowStockTiers.map(tier => (
-              <div class="warning-item">
-                <div>
-                  <p class="text-sm font-medium">{tier.name}</p>
-                  <p class="text-xs text-muted">{tier.event?.title}</p>
-                </div>
-                <span class="warning-count">
-                  {tier.max_stock - tier.sold_count} left
-                </span>
-              </div>
-            ))}
-          </div>
+        <div class="low-stock-alert">
+          <span class="alert-label">Low Stock:</span>
+          {lowStockTiers.map((tier, i) => (
+            <span>
+              {tier.name} ({tier.max_stock - tier.sold_count} left){i < lowStockTiers.length - 1 ? ', ' : ''}
+            </span>
+          ))}
         </div>
       )}
-    </div>
 
-    <div class="dashboard-col">
-      <div class="admin-card">
-        <div class="admin-card-header">
-          <h2 class="admin-card-title">Recent Orders</h2>
-          <a href="/admin/events" class="text-sm">View all</a>
-        </div>
-
-        {recentOrders.length > 0 ? (
-          <div class="orders-list">
-            {recentOrders.map(order => (
-              <div class="order-item">
-                <div class="order-info">
-                  <p class="order-email text-sm">{order.customer_email}</p>
-                  <p class="order-event text-xs text-muted">
-                    {order.event?.title} - {order.tier?.name} × {order.quantity}
-                  </p>
-                </div>
-                <div class="order-meta">
-                  <p class="order-amount text-sm">{formatCurrency(order.amount_paid)}</p>
-                  <p class="order-date text-xs text-muted">{formatDate(order.created_at)}</p>
-                </div>
+      <div class="ticket-tiers-grid">
+        {getOnlineTiers(currentEvent.ticket_tiers || []).map((tier: any) => (
+          <div class="tier-card">
+            <div class="tier-header">
+              <span class="tier-name">{tier.name}</span>
+              <span class="tier-price">{formatCurrency(tier.price)}</span>
+            </div>
+            <div class="tier-progress">
+              <div class="progress-bar">
+                <div
+                  class="progress-fill"
+                  style={`width: ${tier.max_stock ? (tier.sold_count / tier.max_stock) * 100 : 0}%`}
+                ></div>
               </div>
-            ))}
+              <span class="tier-count">
+                {tier.sold_count} / {tier.max_stock || '∞'} sold
+              </span>
+            </div>
           </div>
-        ) : (
-          <p class="text-muted text-sm">No orders yet</p>
-        )}
+        ))}
+      </div>
+
+      <div class="event-stats">
+        <div class="stat">
+          <span class="stat-value">{getTotalSold(getOnlineTiers(currentEvent.ticket_tiers || []))}</span>
+          <span class="stat-label">Tickets Sold</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{formatCurrency(getTotalRevenue(recentOrders))}</span>
+          <span class="stat-label">Revenue</span>
+        </div>
       </div>
     </div>
-  </div>
+  ) : (
+    <div class="empty-state">
+      <p class="text-muted mb-lg">No upcoming events</p>
+      <a href="/admin/events/new" class="btn-primary">Create Event</a>
+    </div>
+  )}
+
+  {recentOrders.length > 0 && (
+    <div class="admin-card mt-xl">
+      <div class="admin-card-header">
+        <h2 class="admin-card-title">Recent Orders</h2>
+        <a href={`/admin/events/${currentEvent?.id}/orders`} class="text-sm">View all</a>
+      </div>
+      <div class="orders-list">
+        {recentOrders.map(order => (
+          <div class="order-item">
+            <div class="order-info">
+              <span class="order-email">{order.customer_email}</span>
+              <span class="order-detail text-muted">
+                {order.tier?.name} × {order.quantity}
+              </span>
+            </div>
+            <div class="order-meta">
+              <span class="order-amount">{formatCurrency(order.amount_paid)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
 </Admin>
 
 <style>
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-lg);
+  .current-event-hero {
+    background: var(--color-bg);
+    padding: var(--space-xl);
   }
 
-  @media (max-width: 1024px) {
-    .dashboard-grid {
-      grid-template-columns: 1fr;
+  .event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+  }
+
+  @media (max-width: 768px) {
+    .event-header {
+      flex-direction: column;
     }
   }
 
-  .dashboard-col {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
-  }
-
-  .next-event h3 {
+  .event-title {
+    font-size: var(--text-3xl);
+    font-weight: 700;
     margin-bottom: var(--space-xs);
   }
 
-  .tier-stats {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    padding-top: var(--space-md);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .tier-stat {
-    display: flex;
-    justify-content: space-between;
+  .event-meta {
+    color: var(--color-muted);
     font-size: var(--text-sm);
   }
 
-  .tier-sold {
+  .event-actions {
+    display: flex;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    display: inline-block;
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .btn-primary::after,
+  .btn-secondary::after {
+    display: none;
+  }
+
+  .btn-primary {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .btn-primary:hover {
+    background: var(--color-muted);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--color-fg);
+    color: var(--color-fg);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .low-stock-alert {
+    background: #fff3cd;
+    color: #856404;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .alert-label {
+    font-weight: 500;
+    margin-right: var(--space-sm);
+  }
+
+  .ticket-tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+  }
+
+  .tier-card {
+    background: var(--color-bg-alt);
+    padding: var(--space-md);
+  }
+
+  .tier-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+  }
+
+  .tier-name {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+  }
+
+  .tier-price {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+  }
+
+  .tier-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--color-border);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--color-fg);
+    transition: width 0.3s ease;
+  }
+
+  .tier-count {
+    font-size: var(--text-xs);
     color: var(--color-muted);
   }
 
-  .warnings {
+  .event-stats {
+    display: flex;
+    gap: var(--space-xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .stat {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
   }
 
-  .warning-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-sm);
-    background: #fff3cd;
-    border-left: 3px solid #ffc107;
+  .stat .stat-value {
+    font-size: var(--text-2xl);
+    font-weight: 700;
   }
 
-  .warning-count {
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: #856404;
+  .stat .stat-label {
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+    text-transform: uppercase;
+  }
+
+  .empty-state {
+    background: var(--color-bg);
+    padding: var(--space-3xl);
+    text-align: center;
   }
 
   .orders-list {
@@ -267,19 +336,26 @@ function formatDate(date: string) {
   .order-item {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: var(--space-md) 0;
     border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-sm);
   }
 
   .order-item:last-child {
     border-bottom: none;
   }
 
-  .order-meta {
-    text-align: right;
+  .order-info {
+    display: flex;
+    gap: var(--space-md);
   }
 
-  .font-medium {
+  .order-email {
+    font-weight: 500;
+  }
+
+  .order-amount {
     font-weight: 500;
   }
 </style>

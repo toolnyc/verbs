@@ -1,5 +1,6 @@
 ---
 import { Font } from 'astro:assets';
+import '../styles/global.css';
 
 interface Props {
   title: string;
@@ -9,11 +10,11 @@ const { title } = Astro.props;
 const currentPath = Astro.url.pathname;
 
 const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: '◉' },
-  { href: '/admin/events', label: 'Events', icon: '◎' },
-  { href: '/admin/djs', label: 'DJs', icon: '♫' },
-  { href: '/admin/mixes', label: 'Mixes', icon: '▶' },
-  { href: '/admin/newsletter', label: 'Newsletter', icon: '✉' },
+  { href: '/admin', label: 'Home' },
+  { href: '/admin/events', label: 'Events' },
+  { href: '/admin/mixes', label: 'Mixes' },
+  { href: '/admin/djs', label: 'DJs' },
+  { href: '/admin/newsletter', label: 'Email' },
 ];
 
 function isActive(href: string) {
@@ -34,10 +35,10 @@ function isActive(href: string) {
   </head>
   <body>
     <div class="admin-layout">
+      <!-- Desktop sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <a href="/" class="logo" target="_blank">VERBS</a>
-          <span class="admin-badge">Admin</span>
+          <a href="/" class="logo">VERBS</a>
         </div>
 
         <nav class="sidebar-nav">
@@ -46,18 +47,47 @@ function isActive(href: string) {
               href={item.href}
               class:list={['nav-item', { active: isActive(item.href) }]}
             >
-              <span class="nav-icon">{item.icon}</span>
-              <span class="nav-label">{item.label}</span>
+              {item.label}
             </a>
           ))}
         </nav>
 
         <div class="sidebar-footer">
+          <a href="/" class="back-to-site">← Back to Site</a>
           <form action="/admin/logout" method="POST">
             <button type="submit" class="logout-btn">Log out</button>
           </form>
         </div>
       </aside>
+
+      <!-- Mobile header (only visible on mobile) -->
+      <header class="mobile-header">
+        <a href="/" class="mobile-logo">VERBS</a>
+        <button class="menu-toggle" aria-label="Toggle menu">
+          <span class="menu-icon"></span>
+        </button>
+      </header>
+
+      <!-- Full screen mobile menu (hidden until opened) -->
+      <div class="mobile-menu" id="mobile-menu">
+        <button class="menu-close" aria-label="Close menu">×</button>
+        <nav class="mobile-nav">
+          {navItems.map(item => (
+            <a
+              href={item.href}
+              class:list={['mobile-nav-item', { active: isActive(item.href) }]}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+        <div class="mobile-menu-footer">
+          <a href="/" class="mobile-back-link">← Back to Site</a>
+          <form action="/admin/logout" method="POST">
+            <button type="submit" class="mobile-logout-btn">Log out</button>
+          </form>
+        </div>
+      </div>
 
       <main class="main-content">
         <header class="page-header">
@@ -69,24 +99,42 @@ function isActive(href: string) {
         </div>
       </main>
     </div>
+
+    <script>
+      const menuToggle = document.querySelector('.menu-toggle');
+      const menuClose = document.querySelector('.menu-close');
+      const mobileMenu = document.getElementById('mobile-menu');
+
+      menuToggle?.addEventListener('click', () => {
+        mobileMenu?.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      });
+
+      menuClose?.addEventListener('click', () => {
+        mobileMenu?.classList.remove('open');
+        document.body.style.overflow = '';
+      });
+
+      // Close menu when clicking a link
+      document.querySelectorAll('.mobile-nav-item').forEach(link => {
+        link.addEventListener('click', () => {
+          mobileMenu?.classList.remove('open');
+          document.body.style.overflow = '';
+        });
+      });
+    </script>
   </body>
 </html>
 
 <style is:global>
-  @import '../styles/global.css';
-
+  /* Desktop layout */
   .admin-layout {
     display: grid;
     grid-template-columns: 240px 1fr;
     min-height: 100vh;
   }
 
-  @media (max-width: 768px) {
-    .admin-layout {
-      grid-template-columns: 1fr;
-    }
-  }
-
+  /* Desktop sidebar */
   .sidebar {
     background: var(--color-fg);
     color: var(--color-bg);
@@ -98,45 +146,212 @@ function isActive(href: string) {
     height: 100vh;
   }
 
+  /* Hide mobile elements on desktop */
+  .mobile-header,
+  .mobile-menu {
+    display: none !important;
+  }
+
+  /* Mobile layout */
   @media (max-width: 768px) {
+    .admin-layout {
+      display: block;
+    }
+
+    /* Hide sidebar on mobile */
     .sidebar {
+      display: none !important;
+    }
+
+    /* Show mobile header */
+    .mobile-header {
+      display: flex !important;
       position: fixed;
-      bottom: 0;
+      top: 0;
       left: 0;
       right: 0;
-      top: auto;
-      height: auto;
-      flex-direction: row;
-      justify-content: space-around;
-      padding: var(--space-sm);
+      height: 56px;
+      background: var(--color-fg);
+      color: var(--color-bg);
+      padding: 0 var(--space-md);
+      align-items: center;
+      justify-content: space-between;
       z-index: 100;
     }
 
-    .sidebar-header,
-    .sidebar-footer {
-      display: none;
+    /* Mobile menu - only show when open */
+    .mobile-menu {
+      display: none !important;
+    }
+
+    .mobile-menu.open {
+      display: flex !important;
+      position: fixed;
+      inset: 0;
+      background: var(--color-fg);
+      color: var(--color-bg);
+      z-index: 200;
+      flex-direction: column;
+      padding: var(--space-xl);
     }
   }
 
-  .sidebar-header {
+  /* Mobile header styles */
+  .mobile-logo {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .mobile-logo::after {
+    display: none;
+  }
+
+  .menu-toggle {
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .menu-toggle:hover {
+    background: transparent;
+  }
+
+  .menu-icon {
+    width: 24px;
+    height: 2px;
+    background: var(--color-bg);
+    position: relative;
+  }
+
+  .menu-icon::before,
+  .menu-icon::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: var(--color-bg);
+    left: 0;
+  }
+
+  .menu-icon::before {
+    top: -8px;
+  }
+
+  .menu-icon::after {
+    top: 8px;
+  }
+
+  /* Mobile menu styles */
+  .menu-close {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    color: var(--color-bg);
+    font-size: var(--text-3xl);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .menu-close:hover {
+    background: transparent;
+    opacity: 0.7;
+  }
+
+  .mobile-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: var(--space-3xl);
+    flex: 1;
+  }
+
+  .mobile-nav-item {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    text-transform: uppercase;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.7;
+    padding: var(--space-sm) 0;
+  }
+
+  .mobile-nav-item::after {
+    display: none;
+  }
+
+  .mobile-nav-item:hover,
+  .mobile-nav-item.active {
+    opacity: 1;
+  }
+
+  .mobile-menu-footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding-top: var(--space-xl);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .mobile-back-link {
+    color: inherit;
+    text-decoration: none;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .mobile-back-link::after {
+    display: none;
+  }
+
+  .mobile-back-link:hover {
+    opacity: 1;
+  }
+
+  .mobile-logout-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: inherit;
+    font-size: var(--text-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .mobile-logout-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-header {
     margin-bottom: var(--space-2xl);
   }
 
-  .logo {
+  .sidebar-header .logo {
     font-size: var(--text-lg);
-    font-weight: 500;
+    font-weight: 700;
     color: inherit;
     text-decoration: none;
-    letter-spacing: 0.1em;
   }
 
-  .admin-badge {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    opacity: 0.5;
+  .sidebar-header .logo::after {
+    display: none;
   }
 
   .sidebar-nav {
@@ -146,23 +361,21 @@ function isActive(href: string) {
     flex: 1;
   }
 
-  @media (max-width: 768px) {
-    .sidebar-nav {
-      flex-direction: row;
-      gap: 0;
-    }
-  }
-
   .nav-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
+    display: block;
     padding: var(--space-sm) var(--space-md);
     color: inherit;
     text-decoration: none;
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    font-weight: 700;
     opacity: 0.7;
     transition: opacity 0.15s, background 0.15s;
     border-radius: 4px;
+  }
+
+  .nav-item::after {
+    display: none;
   }
 
   .nav-item:hover {
@@ -175,26 +388,29 @@ function isActive(href: string) {
     background: rgba(255, 255, 255, 0.15);
   }
 
-  @media (max-width: 768px) {
-    .nav-item {
-      flex-direction: column;
-      padding: var(--space-sm);
-      gap: var(--space-xs);
-    }
-
-    .nav-label {
-      font-size: var(--text-xs);
-    }
-  }
-
-  .nav-icon {
-    font-size: var(--text-lg);
-  }
-
   .sidebar-footer {
     margin-top: auto;
     padding-top: var(--space-lg);
     border-top: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .back-to-site {
+    color: inherit;
+    text-decoration: none;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .back-to-site::after {
+    display: none;
+  }
+
+  .back-to-site:hover {
+    opacity: 1;
   }
 
   .logout-btn {
@@ -211,6 +427,7 @@ function isActive(href: string) {
     color: inherit;
   }
 
+  /* Main content */
   .main-content {
     padding: var(--space-xl);
     background: var(--color-bg-alt);
@@ -220,7 +437,7 @@ function isActive(href: string) {
   @media (max-width: 768px) {
     .main-content {
       padding: var(--space-md);
-      padding-bottom: 80px;
+      padding-top: calc(56px + var(--space-md));
     }
   }
 
@@ -229,8 +446,9 @@ function isActive(href: string) {
   }
 
   .page-title {
-    font-size: var(--text-3xl);
-    font-weight: 500;
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   /* Admin form styles */
@@ -280,8 +498,9 @@ function isActive(href: string) {
   }
 
   .admin-card-title {
-    font-size: var(--text-lg);
-    font-weight: 500;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   /* Admin table */
@@ -301,7 +520,6 @@ function isActive(href: string) {
   .admin-table th {
     font-size: var(--text-xs);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--color-muted);
     font-weight: 500;
   }
@@ -319,7 +537,6 @@ function isActive(href: string) {
     display: inline-block;
     font-size: var(--text-xs);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     padding: var(--space-xs) var(--space-sm);
     border-radius: 2px;
   }
@@ -355,14 +572,13 @@ function isActive(href: string) {
   .stat-label {
     font-size: var(--text-xs);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--color-muted);
     margin-bottom: var(--space-xs);
   }
 
   .stat-value {
     font-size: var(--text-3xl);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   /* Action buttons */

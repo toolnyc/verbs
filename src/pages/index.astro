@@ -1,130 +1,63 @@
 ---
 import Base from '../layouts/Base.astro';
-import Hero from '../components/public/Hero.astro';
-import EventList from '../components/public/EventList.astro';
-import MixPlayer from '../components/public/MixPlayer.astro';
-import NewsletterForm from '../components/public/NewsletterForm.astro';
-import { getPublishedEvents, getPublishedMixes, supabase } from '../lib/supabase';
+import VerbGrid from '../components/public/VerbGrid.astro';
+import { getAllEvents, getPublishedEvents } from '../lib/supabase';
+import { listFlyers } from '../lib/blob';
 
-// Fetch all published events
-const events = await getPublishedEvents();
+// Check if user is authenticated
+const user = Astro.locals.user;
 
-// Find next upcoming event for hero
-const now = new Date();
-const upcomingEvents = events.filter(e => new Date(e.date) >= now);
-const heroEvent = upcomingEvents[0] || events[0]; // Fallback to most recent if no upcoming
+// Fetch events based on auth status:
+// - Authenticated users see published + draft events
+// - Public users see only published events
+const events = user ? await getAllEvents() : await getPublishedEvents();
+// Sort descending so newest events appear first
+events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-// Get DJs for hero event
-let heroDjs: any[] = [];
-if (heroEvent) {
-  const { data: eventDjs } = await supabase
-    .from('event_djs')
-    .select('*, dj:djs(*)')
-    .eq('event_id', heroEvent.id)
-    .order('sort_order');
-
-  heroDjs = eventDjs?.map(ed => ed.dj).filter(Boolean) || [];
+// TEST: Override all event images with blob flyer
+const flyers = await listFlyers();
+// Filter out folder entries (size 0) and get the first actual image
+const testFlyerUrl = flyers.find(f => f.size > 0)?.url;
+if (testFlyerUrl) {
+  events.forEach(e => e.image_url = testFlyerUrl);
 }
 
-// Get hero event tiers
-const heroTiers = heroEvent?.ticket_tiers?.filter((t: any) => t.is_active) || [];
-
-// Fetch mixes
-const mixes = await getPublishedMixes();
+// Find the next upcoming event (closest future date to today)
+const now = new Date();
+const upcomingEvents = events
+  .filter(e => new Date(e.date) >= now)
+  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+const nextEventId = upcomingEvents.length > 0 ? upcomingEvents[0].id : null;
 ---
 
 <Base title="VERBS" description="Events and mixes from VERBS collective">
   <main>
-    <header class="site-header">
-      <div class="container flex justify-between items-center">
-        <a href="/" class="logo no-underline">VERBS</a>
-        <nav class="site-nav">
-          <a href="#events" class="nav-link">Events</a>
-          <a href="#mixes" class="nav-link">Mixes</a>
-        </nav>
-      </div>
-    </header>
-
-    {heroEvent ? (
-      <Hero event={heroEvent} tiers={heroTiers} djs={heroDjs} />
-    ) : (
-      <section class="no-events container">
-        <h1 class="display-text">Coming soon</h1>
-        <p class="text-muted mt-md">Check back for upcoming events.</p>
-      </section>
-    )}
-
-    {events.length > 1 && (
-      <section id="events">
-        <EventList events={events} excludeId={heroEvent?.id} />
-      </section>
-    )}
-
-    <section id="mixes">
-      <MixPlayer mixes={mixes} />
-    </section>
-
-    <NewsletterForm />
+    <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} />
 
     <footer class="site-footer">
       <div class="container flex justify-between items-center">
-        <p class="text-sm text-muted">VERBS © {new Date().getFullYear()}</p>
-        <div class="footer-links">
-          <a href="/unsubscribe" class="text-sm text-muted">Unsubscribe</a>
-        </div>
+        <a href="/" class="footer-logo no-underline">VERBS</a>
+        <p class="text-sm text-muted">&copy; {new Date().getFullYear()}</p>
       </div>
     </footer>
   </main>
 </Base>
 
 <style>
-  .site-header {
-    padding: var(--space-lg) 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-  }
-
-  .logo {
-    font-size: var(--text-xl);
-    font-weight: 500;
-    letter-spacing: 0.15em;
-  }
-
-  .site-nav {
-    display: flex;
-    gap: var(--space-xl);
-  }
-
-  .nav-link {
-    font-size: var(--text-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .no-events {
-    min-height: 80vh;
+  main {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: var(--space-4xl) 0;
+    min-height: 100vh;
   }
 
   .site-footer {
-    padding: var(--space-3xl) 0;
+    margin-top: auto;
+    padding: var(--space-xl) 0;
     border-top: 1px solid var(--color-border);
   }
 
-  .footer-links {
-    display: flex;
-    gap: var(--space-lg);
-  }
-
-  @media (max-width: 768px) {
-    .site-nav {
-      display: none;
-    }
+  .footer-logo {
+    font-size: var(--text-lg);
+    font-weight: 500;
   }
 </style>

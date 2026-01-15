@@ -20,44 +20,10 @@ if (supabaseAdmin) {
   djs = data || [];
 }
 
-// Handle form submissions
+// Handle delete
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
   const action = formData.get('action');
-
-  if (action === 'create') {
-    const { error: insertError } = await supabaseAdmin
-      .from('djs')
-      .insert({
-        name: formData.get('name'),
-        instagram_url: formData.get('instagram_url') || null,
-        soundcloud_url: formData.get('soundcloud_url') || null,
-      });
-
-    if (insertError) {
-      error = insertError.message;
-    } else {
-      success = 'DJ created';
-    }
-  }
-
-  if (action === 'update') {
-    const djId = formData.get('dj_id');
-    const { error: updateError } = await supabaseAdmin
-      .from('djs')
-      .update({
-        name: formData.get('name'),
-        instagram_url: formData.get('instagram_url') || null,
-        soundcloud_url: formData.get('soundcloud_url') || null,
-      })
-      .eq('id', djId);
-
-    if (updateError) {
-      error = updateError.message;
-    } else {
-      success = 'DJ updated';
-    }
-  }
 
   if (action === 'delete') {
     const djId = formData.get('dj_id');
@@ -69,16 +35,9 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
     if (deleteError) {
       error = deleteError.message;
     } else {
-      success = 'DJ deleted';
+      return Astro.redirect('/admin/djs');
     }
   }
-
-  // Refresh DJs
-  const { data: refreshed } = await supabaseAdmin
-    .from('djs')
-    .select(`*, event_djs(event:events(id, title, date))`)
-    .order('name');
-  djs = refreshed || [];
 }
 
 function getUpcomingEvents(dj: any) {
@@ -87,197 +46,165 @@ function getUpcomingEvents(dj: any) {
     .filter((ed: any) => ed.event && new Date(ed.event.date) > now)
     .map((ed: any) => ed.event);
 }
+
+function getPastEventsCount(dj: any) {
+  const now = new Date();
+  return (dj.event_djs || [])
+    .filter((ed: any) => ed.event && new Date(ed.event.date) <= now)
+    .length;
+}
 ---
 
 <Admin title="DJs">
   {error && <p class="error-message mb-lg">{error}</p>}
-  {success && <p class="success-message mb-lg">{success}</p>}
 
-  <div class="content-grid">
-    <div class="main-content">
-      {djs.length > 0 ? (
-        <div class="djs-list">
-          {djs.map(dj => {
-            const upcomingEvents = getUpcomingEvents(dj);
-            return (
-              <details class="dj-item">
-                <summary class="dj-header">
-                  <span class="dj-name">{dj.name}</span>
-                  <span class="dj-events text-sm text-muted">
-                    {upcomingEvents.length} upcoming event{upcomingEvents.length !== 1 ? 's' : ''}
-                  </span>
-                </summary>
-
-                <div class="dj-details">
-                  <form method="POST" class="dj-form">
-                    <input type="hidden" name="action" value="update" />
-                    <input type="hidden" name="dj_id" value={dj.id} />
-
-                    <div class="form-group">
-                      <label class="form-label">Name</label>
-                      <input type="text" name="name" value={dj.name} required />
-                    </div>
-
-                    <div class="form-group">
-                      <label class="form-label">Instagram URL</label>
-                      <input type="url" name="instagram_url" value={dj.instagram_url || ''} placeholder="https://instagram.com/..." />
-                    </div>
-
-                    <div class="form-group">
-                      <label class="form-label">SoundCloud URL</label>
-                      <input type="url" name="soundcloud_url" value={dj.soundcloud_url || ''} placeholder="https://soundcloud.com/..." />
-                    </div>
-
-                    <div class="form-actions-inline">
-                      <button type="submit" class="btn-sm">Save</button>
-                      {dj.event_djs.length === 0 && (
-                        <button type="submit" name="action" value="delete" class="btn-sm btn-danger" onclick="return confirm('Delete this DJ?')">
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </form>
-
-                  {upcomingEvents.length > 0 && (
-                    <div class="dj-upcoming">
-                      <p class="text-xs text-uppercase text-muted mb-sm">Upcoming Events</p>
-                      <ul class="events-list-small">
-                        {upcomingEvents.map((event: any) => (
-                          <li>
-                            <a href={`/admin/events/${event.id}`}>{event.title}</a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      ) : (
-        <div class="empty-state">
-          <p class="text-muted">No DJs yet</p>
-        </div>
-      )}
-    </div>
-
-    <div class="sidebar">
-      <div class="admin-card">
-        <div class="admin-card-header">
-          <h2 class="admin-card-title">Add DJ</h2>
-        </div>
-
-        <form method="POST">
-          <input type="hidden" name="action" value="create" />
-
-          <div class="form-group">
-            <label class="form-label">Name *</label>
-            <input type="text" name="name" required />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Instagram URL</label>
-            <input type="url" name="instagram_url" placeholder="https://instagram.com/..." />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">SoundCloud URL</label>
-            <input type="url" name="soundcloud_url" placeholder="https://soundcloud.com/..." />
-          </div>
-
-          <button type="submit" class="mt-md">Add DJ</button>
-        </form>
-      </div>
-    </div>
+  <div class="page-actions">
+    <div class="dj-count text-muted">{djs.length} DJ{djs.length !== 1 ? 's' : ''}</div>
+    <a href="/admin/djs/new" class="btn-primary">New DJ</a>
   </div>
+
+  {djs.length > 0 ? (
+    <div class="djs-list">
+      {djs.map(dj => {
+        const upcomingEvents = getUpcomingEvents(dj);
+        const pastCount = getPastEventsCount(dj);
+
+        return (
+          <div class="dj-row">
+            <div class="dj-info">
+              <h3 class="dj-name">
+                <a href={`/admin/djs/${dj.id}`}>{dj.name}</a>
+              </h3>
+              <div class="dj-links">
+                {dj.instagram_url && (
+                  <a href={dj.instagram_url} target="_blank" class="text-sm text-muted">Instagram</a>
+                )}
+                {dj.soundcloud_url && (
+                  <a href={dj.soundcloud_url} target="_blank" class="text-sm text-muted">SoundCloud</a>
+                )}
+              </div>
+            </div>
+
+            <div class="dj-events text-sm text-muted">
+              {upcomingEvents.length > 0 && (
+                <span>{upcomingEvents.length} upcoming</span>
+              )}
+              {pastCount > 0 && (
+                <span>{pastCount} past</span>
+              )}
+              {upcomingEvents.length === 0 && pastCount === 0 && (
+                <span>No events</span>
+              )}
+            </div>
+
+            <div class="dj-actions">
+              <a href={`/admin/djs/${dj.id}`} class="btn-sm secondary">Edit</a>
+              {dj.event_djs.length === 0 && (
+                <form method="POST" class="inline-form">
+                  <input type="hidden" name="action" value="delete" />
+                  <input type="hidden" name="dj_id" value={dj.id} />
+                  <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this DJ?')">Delete</button>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <div class="empty-state">
+      <p class="text-muted">No DJs yet</p>
+      <a href="/admin/djs/new" class="mt-md">Add your first DJ</a>
+    </div>
+  )}
 </Admin>
 
 <style>
-  .content-grid {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: var(--space-xl);
-    align-items: start;
-  }
-
-  @media (max-width: 1024px) {
-    .content-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-      order: -1;
-    }
-  }
-
-  .djs-list {
-    background: var(--color-bg);
-  }
-
-  .dj-item {
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .dj-item:last-child {
-    border-bottom: none;
-  }
-
-  .dj-header {
+  .page-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-lg);
-    cursor: pointer;
-    list-style: none;
+    margin-bottom: var(--space-xl);
+    gap: var(--space-md);
   }
 
-  .dj-header::-webkit-details-marker {
-    display: none;
-  }
-
-  .dj-header::before {
-    content: '▸';
-    margin-right: var(--space-sm);
-    transition: transform 0.2s;
-  }
-
-  details[open] .dj-header::before {
-    transform: rotate(90deg);
-  }
-
-  .dj-name {
-    font-weight: 500;
-  }
-
-  .dj-details {
-    padding: 0 var(--space-lg) var(--space-lg);
-    background: var(--color-bg-alt);
-  }
-
-  .dj-form {
-    padding: var(--space-lg);
-    background: var(--color-bg);
-  }
-
-  .form-actions-inline {
-    display: flex;
-    gap: var(--space-sm);
-    margin-top: var(--space-md);
-  }
-
-  .dj-upcoming {
-    padding: var(--space-md);
-    margin-top: var(--space-md);
-  }
-
-  .events-list-small {
-    list-style: none;
+  .btn-primary {
+    display: inline-block;
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--color-fg);
+    color: var(--color-bg);
+    text-decoration: none;
+    font-weight: 700;
+    text-transform: uppercase;
     font-size: var(--text-sm);
   }
 
-  .events-list-small li {
-    padding: var(--space-xs) 0;
+  .btn-primary::after {
+    display: none;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .djs-list {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg);
+  }
+
+  .dj-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-lg);
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .dj-row:last-child {
+    border-bottom: none;
+  }
+
+  .dj-name {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+  }
+
+  .dj-name a {
+    text-decoration: none;
+  }
+
+  .dj-name a::after {
+    display: none;
+  }
+
+  .dj-name a:hover {
+    text-decoration: underline;
+  }
+
+  .dj-links {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .dj-links a::after {
+    display: none;
+  }
+
+  .dj-events {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .dj-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .inline-form {
+    display: inline;
   }
 
   .empty-state {
@@ -292,9 +219,15 @@ function getUpcomingEvents(dj: any) {
     padding: var(--space-md);
   }
 
-  .success-message {
-    background: #e6f4ea;
-    color: #137333;
-    padding: var(--space-md);
+  @media (max-width: 768px) {
+    .dj-row {
+      grid-template-columns: 1fr;
+      gap: var(--space-sm);
+    }
+
+    .dj-events,
+    .dj-actions {
+      justify-self: start;
+    }
   }
 </style>

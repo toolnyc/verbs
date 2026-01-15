@@ -1,0 +1,94 @@
+---
+import type { Event } from '../../lib/supabase';
+
+interface Props {
+  events: Event[];
+  isAuthenticated?: boolean;
+  featuredEventId?: string | null;
+}
+
+const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
+---
+
+<div class="verb-grid">
+  {events.map(event => {
+    const isPublished = event.status === 'published';
+    const isDraft = event.status === 'draft';
+    const isFeatured = event.id === featuredEventId;
+    // Published events are always clickable; drafts only when authenticated
+    const isClickable = isPublished || (isDraft && isAuthenticated);
+
+    return isClickable ? (
+      <a href={`/events/${event.id}`} class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}>
+        <div class="verb-thumbnail">
+          {event.image_url ? (
+            <img src={event.image_url} alt="" loading="lazy" />
+          ) : (
+            <div class="verb-placeholder"></div>
+          )}
+        </div>
+        <span class="verb-title">{event.title}</span>
+        {isDraft && <span class="draft-badge">Draft</span>}
+        {event.image_url && (
+          <div class="flyer-preview">
+            <img src={event.image_url} alt={event.title} />
+          </div>
+        )}
+      </a>
+    ) : (
+      <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
+        <div class="verb-thumbnail">
+          {event.image_url ? (
+            <img src={event.image_url} alt="" loading="lazy" />
+          ) : (
+            <div class="verb-placeholder"></div>
+          )}
+        </div>
+        <span class="verb-title">{event.title}</span>
+        {event.image_url && (
+          <div class="flyer-preview">
+            <img src={event.image_url} alt={event.title} />
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
+
+<style>
+  .verb-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--color-bg-alt) 0%, var(--color-border) 100%);
+  }
+
+  .verb-item.draft {
+    position: relative;
+  }
+
+  .draft-badge {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-fg);
+    opacity: 0.8;
+  }
+</style>
+
+<script>
+  import { createHoverPreview } from '../../lib/animations';
+
+  // Initialize hover previews for all verb items
+  const verbItems = document.querySelectorAll('.verb-item');
+
+  verbItems.forEach(item => {
+    const preview = item.querySelector('.flyer-preview') as HTMLElement;
+    if (!preview) return;
+
+    createHoverPreview(item as HTMLElement, preview);
+  });
+</script>

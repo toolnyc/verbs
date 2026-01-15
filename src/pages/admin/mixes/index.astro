@@ -4,85 +4,34 @@ import { supabaseAdmin } from '../../../lib/supabase';
 
 let mixes: any[] = [];
 let error = '';
-let success = '';
-
-const status = Astro.url.searchParams.get('status') || 'all';
 
 if (supabaseAdmin) {
-  let query = supabaseAdmin.from('mixes').select('*').order('created_at', { ascending: false });
+  const { data } = await supabaseAdmin
+    .from('mixes')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  if (status !== 'all') {
-    query = query.eq('status', status);
-  }
-
-  const { data } = await query;
   mixes = data || [];
 }
 
-// Handle form submissions
+// Handle delete
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
   const action = formData.get('action');
 
-  if (action === 'create') {
-    const audioUrl = formData.get('audio_url') as string;
-
-    const { error: insertError } = await supabaseAdmin
-      .from('mixes')
-      .insert({
-        title: formData.get('title'),
-        description: formData.get('description') || null,
-        audio_url: audioUrl,
-        cover_image_url: formData.get('cover_image_url') || null,
-        duration_seconds: formData.get('duration_seconds') ? parseInt(formData.get('duration_seconds') as string) : null,
-        status: formData.get('status') || 'draft',
-      });
-
-    if (insertError) {
-      error = insertError.message;
-    } else {
-      success = 'Mix created';
-    }
-  }
-
-  if (action === 'update') {
-    const mixId = formData.get('mix_id');
-    const { error: updateError } = await supabaseAdmin
-      .from('mixes')
-      .update({
-        title: formData.get('title'),
-        description: formData.get('description') || null,
-        audio_url: formData.get('audio_url'),
-        cover_image_url: formData.get('cover_image_url') || null,
-        duration_seconds: formData.get('duration_seconds') ? parseInt(formData.get('duration_seconds') as string) : null,
-        status: formData.get('status'),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', mixId);
-
-    if (updateError) {
-      error = updateError.message;
-    } else {
-      success = 'Mix updated';
-    }
-  }
-
   if (action === 'delete') {
     const mixId = formData.get('mix_id');
-    const { error: deleteError } = await supabaseAdmin.from('mixes').delete().eq('id', mixId);
+    const { error: deleteError } = await supabaseAdmin
+      .from('mixes')
+      .delete()
+      .eq('id', mixId);
 
     if (deleteError) {
       error = deleteError.message;
     } else {
-      success = 'Mix deleted';
+      return Astro.redirect('/admin/mixes');
     }
   }
-
-  // Refresh
-  let query = supabaseAdmin.from('mixes').select('*').order('created_at', { ascending: false });
-  if (status !== 'all') query = query.eq('status', status);
-  const { data: refreshed } = await query;
-  mixes = refreshed || [];
 }
 
 function formatDuration(seconds: number | null) {
@@ -99,293 +48,126 @@ function formatDate(date: string) {
     year: 'numeric',
   });
 }
-
-const filters = [
-  { value: 'all', label: 'All' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'published', label: 'Published' },
-];
 ---
 
 <Admin title="Mixes">
   {error && <p class="error-message mb-lg">{error}</p>}
-  {success && <p class="success-message mb-lg">{success}</p>}
 
   <div class="page-actions">
-    <div class="filters">
-      {filters.map(f => (
-        <a
-          href={`/admin/mixes${f.value === 'all' ? '' : `?status=${f.value}`}`}
-          class:list={['filter-btn', { active: status === f.value }]}
-        >
-          {f.label}
-        </a>
+    <div class="mix-count text-muted">{mixes.length} mix{mixes.length !== 1 ? 'es' : ''}</div>
+    <a href="/admin/mixes/new" class="btn-primary">New Mix</a>
+  </div>
+
+  {mixes.length > 0 ? (
+    <div class="mixes-list">
+      {mixes.map(mix => (
+        <div class="mix-row">
+          <div class="mix-info">
+            <h3 class="mix-title">
+              <a href={`/admin/mixes/${mix.id}`}>{mix.title}</a>
+            </h3>
+            <div class="mix-meta text-sm text-muted">
+              {formatDuration(mix.duration_seconds)} · {formatDate(mix.created_at)}
+            </div>
+          </div>
+
+          <div class="mix-status text-sm text-muted">
+            <span class:list={['status-badge', mix.status]}>
+              {mix.status}
+            </span>
+          </div>
+
+          <div class="mix-actions">
+            <a href={`/admin/mixes/${mix.id}`} class="btn-sm secondary">Edit</a>
+            <form method="POST" class="inline-form">
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="mix_id" value={mix.id} />
+              <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this mix?')">Delete</button>
+            </form>
+          </div>
+        </div>
       ))}
     </div>
-  </div>
-
-  <div class="content-grid">
-    <div class="main-content">
-      {mixes.length > 0 ? (
-        <div class="mixes-list">
-          {mixes.map(mix => (
-            <details class="mix-item">
-              <summary class="mix-header">
-                <div class="mix-cover">
-                  {mix.cover_image_url ? (
-                    <img src={mix.cover_image_url} alt="" />
-                  ) : (
-                    <div class="cover-placeholder">♫</div>
-                  )}
-                </div>
-                <div class="mix-info">
-                  <span class="mix-title">{mix.title}</span>
-                  <span class="mix-meta text-sm text-muted">
-                    {formatDuration(mix.duration_seconds)} · {formatDate(mix.created_at)}
-                  </span>
-                </div>
-                <span class:list={['status-badge', mix.status]}>
-                  {mix.status}
-                </span>
-              </summary>
-
-              <div class="mix-details">
-                <form method="POST" class="mix-form">
-                  <input type="hidden" name="action" value="update" />
-                  <input type="hidden" name="mix_id" value={mix.id} />
-
-                  <div class="form-group">
-                    <label class="form-label">Title *</label>
-                    <input type="text" name="title" value={mix.title} required />
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea name="description" rows="3">{mix.description}</textarea>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Audio URL *</label>
-                    <input type="url" name="audio_url" value={mix.audio_url} required />
-                    <p class="form-hint">Upload audio and paste the URL here</p>
-                  </div>
-
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label class="form-label">Cover Image URL</label>
-                      <input type="url" name="cover_image_url" value={mix.cover_image_url || ''} />
-                    </div>
-
-                    <div class="form-group">
-                      <label class="form-label">Duration (seconds)</label>
-                      <input type="number" name="duration_seconds" value={mix.duration_seconds || ''} />
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label class="form-label">Status</label>
-                    <select name="status">
-                      <option value="draft" selected={mix.status === 'draft'}>Draft</option>
-                      <option value="published" selected={mix.status === 'published'}>Published</option>
-                    </select>
-                  </div>
-
-                  <div class="form-actions-inline">
-                    <button type="submit" class="btn-sm">Save</button>
-                    <button type="submit" name="action" value="delete" class="btn-sm btn-danger" onclick="return confirm('Delete this mix?')">
-                      Delete
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </details>
-          ))}
-        </div>
-      ) : (
-        <div class="empty-state">
-          <p class="text-muted">No mixes found</p>
-        </div>
-      )}
+  ) : (
+    <div class="empty-state">
+      <p class="text-muted">No mixes yet</p>
+      <a href="/admin/mixes/new" class="mt-md">Add your first mix</a>
     </div>
-
-    <div class="sidebar">
-      <div class="admin-card">
-        <div class="admin-card-header">
-          <h2 class="admin-card-title">Add Mix</h2>
-        </div>
-
-        <form method="POST">
-          <input type="hidden" name="action" value="create" />
-
-          <div class="form-group">
-            <label class="form-label">Title *</label>
-            <input type="text" name="title" required />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea name="description" rows="3"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Audio URL *</label>
-            <input type="url" name="audio_url" required placeholder="https://" />
-            <p class="form-hint">Upload to Vercel Blob first, then paste URL</p>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Cover Image URL</label>
-            <input type="url" name="cover_image_url" placeholder="https://" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Duration (seconds)</label>
-            <input type="number" name="duration_seconds" min="0" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Status</label>
-            <select name="status">
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </select>
-          </div>
-
-          <button type="submit" class="mt-md">Add Mix</button>
-        </form>
-      </div>
-    </div>
-  </div>
+  )}
 </Admin>
 
 <style>
   .page-actions {
-    margin-bottom: var(--space-xl);
-  }
-
-  .filters {
     display: flex;
-    gap: var(--space-xs);
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    gap: var(--space-md);
   }
 
-  .filter-btn {
-    padding: var(--space-xs) var(--space-md);
-    font-size: var(--text-sm);
-    text-decoration: none;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg);
-  }
-
-  .filter-btn:hover {
-    background: var(--color-bg-alt);
-  }
-
-  .filter-btn.active {
+  .btn-primary {
+    display: inline-block;
+    padding: var(--space-sm) var(--space-lg);
     background: var(--color-fg);
     color: var(--color-bg);
-    border-color: var(--color-fg);
+    text-decoration: none;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: var(--text-sm);
   }
 
-  .content-grid {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: var(--space-xl);
-    align-items: start;
-  }
-
-  @media (max-width: 1024px) {
-    .content-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-      order: -1;
-    }
-  }
-
-  .mixes-list {
-    background: var(--color-bg);
-  }
-
-  .mix-item {
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .mix-item:last-child {
-    border-bottom: none;
-  }
-
-  .mix-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .mix-header::-webkit-details-marker {
+  .btn-primary::after {
     display: none;
   }
 
-  .mix-cover {
-    width: 60px;
-    height: 60px;
-    flex-shrink: 0;
+  .btn-primary:hover {
+    opacity: 0.9;
   }
 
-  .mix-cover img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .cover-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-alt);
-    font-size: var(--text-xl);
-    color: var(--color-muted);
-  }
-
-  .mix-info {
-    flex: 1;
+  .mixes-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-    min-width: 0;
-  }
-
-  .mix-title {
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .mix-details {
-    padding: 0 var(--space-md) var(--space-md);
-    background: var(--color-bg-alt);
-  }
-
-  .mix-form {
-    padding: var(--space-lg);
     background: var(--color-bg);
   }
 
-  .form-row {
+  .mix-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-md);
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-lg);
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .form-actions-inline {
+  .mix-row:last-child {
+    border-bottom: none;
+  }
+
+  .mix-title {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+  }
+
+  .mix-title a {
+    text-decoration: none;
+  }
+
+  .mix-title a::after {
+    display: none;
+  }
+
+  .mix-title a:hover {
+    text-decoration: underline;
+  }
+
+  .mix-actions {
     display: flex;
     gap: var(--space-sm);
-    margin-top: var(--space-md);
+  }
+
+  .inline-form {
+    display: inline;
   }
 
   .empty-state {
@@ -400,9 +182,15 @@ const filters = [
     padding: var(--space-md);
   }
 
-  .success-message {
-    background: #e6f4ea;
-    color: #137333;
-    padding: var(--space-md);
+  @media (max-width: 768px) {
+    .mix-row {
+      grid-template-columns: 1fr;
+      gap: var(--space-sm);
+    }
+
+    .mix-status,
+    .mix-actions {
+      justify-self: start;
+    }
   }
 </style>

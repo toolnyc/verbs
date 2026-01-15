@@ -3,19 +3,15 @@ import { supabaseAdmin } from './lib/supabase';
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
+  const isAdminRoute = pathname.startsWith('/admin') && pathname !== '/admin/login';
 
-  // Only protect /admin routes (except login)
-  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-    // Get session token from cookie
-    const accessToken = context.cookies.get('sb-access-token')?.value;
-    const refreshToken = context.cookies.get('sb-refresh-token')?.value;
+  // Get session token from cookie
+  const accessToken = context.cookies.get('sb-access-token')?.value;
+  const refreshToken = context.cookies.get('sb-refresh-token')?.value;
 
-    if (!accessToken || !supabaseAdmin) {
-      return context.redirect('/admin/login');
-    }
-
+  // Try to authenticate user for all routes (required for admin, optional for public)
+  if (accessToken && supabaseAdmin) {
     try {
-      // Verify session with Supabase
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
 
       if (error || !user) {
@@ -29,29 +25,31 @@ export const onRequest = defineMiddleware(async (context, next) => {
             // Clear invalid cookies
             context.cookies.delete('sb-access-token', { path: '/' });
             context.cookies.delete('sb-refresh-token', { path: '/' });
-            return context.redirect('/admin/login');
+            if (isAdminRoute) {
+              return context.redirect('/admin/login');
+            }
+          } else {
+            // Update cookies with new tokens
+            context.cookies.set('sb-access-token', refreshData.session.access_token, {
+              path: '/',
+              httpOnly: true,
+              secure: import.meta.env.PROD,
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24, // 1 day
+            });
+
+            context.cookies.set('sb-refresh-token', refreshData.session.refresh_token, {
+              path: '/',
+              httpOnly: true,
+              secure: import.meta.env.PROD,
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 7, // 7 days
+            });
+
+            // Store user in locals for page access
+            context.locals.user = refreshData.user;
           }
-
-          // Update cookies with new tokens
-          context.cookies.set('sb-access-token', refreshData.session.access_token, {
-            path: '/',
-            httpOnly: true,
-            secure: import.meta.env.PROD,
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24, // 1 day
-          });
-
-          context.cookies.set('sb-refresh-token', refreshData.session.refresh_token, {
-            path: '/',
-            httpOnly: true,
-            secure: import.meta.env.PROD,
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7, // 7 days
-          });
-
-          // Store user in locals for page access
-          context.locals.user = refreshData.user;
-        } else {
+        } else if (isAdminRoute) {
           return context.redirect('/admin/login');
         }
       } else {
@@ -60,8 +58,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
       }
     } catch (err) {
       console.error('Auth middleware error:', err);
-      return context.redirect('/admin/login');
+      if (isAdminRoute) {
+        return context.redirect('/admin/login');
+      }
     }
+  } else if (isAdminRoute) {
+    // No token but trying to access admin route
+    return context.redirect('/admin/login');
   }
 
   return next();
