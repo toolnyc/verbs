@@ -11,7 +11,7 @@ export default defineConfig({
         provider: fontProviders.adobe({ id: 'dxj3lbp' }),
         name: 'Neue Haas Grotesk Display',
         cssVariable: '--font-sans',
-        weights: [400, 500, 700],
+        weights: [500, 700],
         styles: ['normal', 'italic'],
         fallbacks: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
