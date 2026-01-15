@@ -36,8 +36,12 @@ const mixes = await getPublishedMixes();
 <Base title="VERBS" description="Events and mixes from VERBS collective">
   <main>
     <header class="site-header">
-      <div class="container">
-        <a href="/" class="logo">VERBS</a>
+      <div class="container flex justify-between items-center">
+        <a href="/" class="logo no-underline">VERBS</a>
+        <nav class="site-nav">
+          <a href="#events" class="nav-link">Events</a>
+          <a href="#mixes" class="nav-link">Mixes</a>
+        </nav>
       </div>
     </header>
 
@@ -45,22 +49,29 @@ const mixes = await getPublishedMixes();
       <Hero event={heroEvent} tiers={heroTiers} djs={heroDjs} />
     ) : (
       <section class="no-events container">
-        <h1>Coming soon</h1>
+        <h1 class="display-text">Coming soon</h1>
         <p class="text-muted mt-md">Check back for upcoming events.</p>
       </section>
     )}
 
     {events.length > 1 && (
-      <EventList events={events} excludeId={heroEvent?.id} />
+      <section id="events">
+        <EventList events={events} excludeId={heroEvent?.id} />
+      </section>
     )}
 
-    <MixPlayer mixes={mixes} />
+    <section id="mixes">
+      <MixPlayer mixes={mixes} />
+    </section>
 
     <NewsletterForm />
 
     <footer class="site-footer">
-      <div class="container">
-        <p class="text-sm text-muted">VERBS</p>
+      <div class="container flex justify-between items-center">
+        <p class="text-sm text-muted">VERBS © {new Date().getFullYear()}</p>
+        <div class="footer-links">
+          <a href="/unsubscribe" class="text-sm text-muted">Unsubscribe</a>
+        </div>
       </div>
     </footer>
   </main>
@@ -77,26 +88,43 @@ const mixes = await getPublishedMixes();
   }
 
   .logo {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
     font-weight: 500;
-    text-decoration: none;
+    letter-spacing: 0.15em;
+  }
+
+  .site-nav {
+    display: flex;
+    gap: var(--space-xl);
+  }
+
+  .nav-link {
+    font-size: var(--text-sm);
+    text-transform: uppercase;
     letter-spacing: 0.1em;
   }
 
   .no-events {
-    min-height: 60vh;
+    min-height: 80vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     padding: var(--space-4xl) 0;
   }
 
-  .no-events h1 {
-    font-size: var(--text-6xl);
+  .site-footer {
+    padding: var(--space-3xl) 0;
+    border-top: 1px solid var(--color-border);
   }
 
-  .site-footer {
-    padding: var(--space-2xl) 0;
-    border-top: 1px solid var(--color-border);
+  .footer-links {
+    display: flex;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 768px) {
+    .site-nav {
+      display: none;
+    }
   }
 </style>

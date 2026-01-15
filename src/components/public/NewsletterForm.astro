@@ -5,7 +5,7 @@
 <section class="newsletter">
   <div class="container">
     <div class="newsletter-content">
-      <h2 class="newsletter-title">Stay in the loop</h2>
+      <h2 class="newsletter-title display-text">Stay in the loop</h2>
       <p class="newsletter-text text-muted">Get notified about upcoming events and new mixes.</p>
 
       <form class="newsletter-form" id="newsletterForm">
@@ -13,12 +13,17 @@
           <input
             type="email"
             name="email"
-            placeholder="your@email.com"
+            placeholder="Enter your email"
             required
             autocomplete="email"
             class="email-input"
           />
-          <button type="submit" class="submit-btn">Subscribe</button>
+          <button type="submit" class="submit-btn">
+            <span class="btn-text">Subscribe</span>
+            <svg class="btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
         </div>
         <p class="form-message" id="formMessage"></p>
       </form>
@@ -29,20 +34,19 @@
 <style>
   .newsletter {
     padding: var(--space-4xl) 0;
-    border-top: 1px solid var(--color-border);
   }
 
   .newsletter-content {
-    max-width: 500px;
+    max-width: 600px;
   }
 
   .newsletter-title {
-    font-size: var(--text-4xl);
-    margin-bottom: var(--space-sm);
+    margin-bottom: var(--space-md);
   }
 
   .newsletter-text {
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-2xl);
+    font-size: var(--text-lg);
   }
 
   .newsletter-form {
@@ -53,15 +57,30 @@
 
   .form-row {
     display: flex;
-    gap: var(--space-sm);
+    gap: 0;
   }
 
   .email-input {
     flex: 1;
+    border-right: none;
+    font-size: var(--text-lg);
+    padding: var(--space-md) var(--space-lg);
   }
 
   .submit-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-xl);
     white-space: nowrap;
+  }
+
+  .btn-arrow {
+    transition: transform 0.2s ease;
+  }
+
+  .submit-btn:hover .btn-arrow {
+    transform: translateX(4px);
   }
 
   .form-message {
@@ -77,13 +96,19 @@
     color: #b00;
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: 640px) {
     .form-row {
       flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .email-input {
+      border-right: 1px solid var(--color-fg);
     }
 
     .submit-btn {
       width: 100%;
+      justify-content: center;
     }
   }
 </style>

@@ -26,23 +26,30 @@ const formattedTime = eventDate.toLocaleTimeString('en-US', {
 const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
 ---
 
-<article class="event-card" class:list={{ past: isPast, compact }}>
-  <div class="event-date">
-    <span class="date text-3xl">{eventDate.getDate()}</span>
-    <span class="month text-sm text-uppercase">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+<article class="event-card card-hover" class:list={{ past: isPast, compact }}>
+  <div class="event-image-wrapper img-hover-reveal">
+    {event.image_url ? (
+      <img src={event.image_url} alt={event.title} class="event-image" />
+    ) : (
+      <div class="event-image img-placeholder"></div>
+    )}
+    <div class="event-date-overlay">
+      <span class="date-day">{eventDate.getDate()}</span>
+      <span class="date-month text-uppercase">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+    </div>
   </div>
 
   <div class="event-details">
     <h3 class="event-title">{event.title}</h3>
-    <p class="event-venue text-sm text-muted">
-      {event.venue_name}, {event.venue_city}
+    <p class="event-meta text-sm text-muted">
+      {event.venue_name} · {formattedTime}
     </p>
-    <p class="event-time text-sm">{formattedTime}</p>
+    <p class="event-city text-xs text-muted">{event.venue_city}</p>
   </div>
 
   {!compact && !isPast && tiers.length > 0 && (
     <div class="event-tickets">
-      {tiers.slice(0, 2).map(tier => (
+      {tiers.slice(0, 1).map(tier => (
         <TicketTierButton tier={tier} eventId={event.id} />
       ))}
     </div>
@@ -50,46 +57,69 @@ const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
 
   {isPast && (
     <div class="event-status">
-      <span class="text-xs text-muted text-uppercase">Past</span>
+      <span class="badge">Past</span>
     </div>
   )}
 </article>
 
 <style>
   .event-card {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: var(--space-lg);
-    padding: var(--space-lg) 0;
-    border-bottom: 1px solid var(--color-border);
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+    background: var(--color-bg);
   }
 
   .event-card.past {
-    opacity: 0.4;
+    opacity: 0.5;
   }
 
   .event-card.compact {
-    grid-template-columns: auto 1fr;
+    width: 280px;
   }
 
-  .event-date {
+  .event-image-wrapper {
+    position: relative;
+    aspect-ratio: 4/5;
+    background: var(--color-bg-alt);
+  }
+
+  .event-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .img-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--color-bg-alt) 0%, var(--color-border) 100%);
+  }
+
+  .event-date-overlay {
+    position: absolute;
+    bottom: var(--space-md);
+    left: var(--space-md);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    min-width: 60px;
+    background: var(--color-bg);
+    padding: var(--space-sm) var(--space-md);
+    line-height: 1.1;
   }
 
-  .date {
-    line-height: 1;
+  .date-day {
+    font-size: var(--text-3xl);
     font-weight: 500;
   }
 
-  .month {
+  .date-month {
+    font-size: var(--text-xs);
+    letter-spacing: 0.1em;
     color: var(--color-muted);
   }
 
   .event-details {
+    padding: var(--space-lg) 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
@@ -98,28 +128,26 @@ const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
   .event-title {
     font-size: var(--text-xl);
     font-weight: 500;
+    line-height: 1.2;
   }
 
   .event-tickets {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    min-width: 200px;
   }
 
   .event-status {
-    display: flex;
-    align-items: center;
+    margin-top: var(--space-sm);
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 480px) {
     .event-card {
-      grid-template-columns: auto 1fr;
+      width: 280px;
     }
 
-    .event-tickets {
-      grid-column: 1 / -1;
-      margin-top: var(--space-md);
+    .event-card.compact {
+      width: 240px;
     }
   }
 </style>

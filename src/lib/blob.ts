@@ -1,4 +1,4 @@
-import { put, del } from '@vercel/blob';
+import { put, del, list } from '@vercel/blob';
 
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 const allowedAudioTypes = ['audio/mpeg', 'audio/aiff', 'audio/wav', 'audio/x-aiff'];
@@ -37,6 +37,17 @@ export async function uploadAudio(file: File): Promise<string> {
 
 export async function deleteBlob(url: string): Promise<void> {
   await del(url);
+}
+
+export async function listFlyers() {
+  const { blobs } = await list({ prefix: 'flyers/' });
+  return blobs;
+}
+
+export async function getTestFlyer() {
+  const flyers = await listFlyers();
+  const testImage = flyers.find((blob) => blob.pathname.includes('test'));
+  return testImage?.url;
 }
 
 export function getContentType(filename: string): string {

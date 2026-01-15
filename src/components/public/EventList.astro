@@ -39,52 +39,77 @@ const years = Object.keys(eventsByYear)
 
 <section class="events-list">
   <div class="container">
-    <h2 class="section-title">All Events</h2>
-
-    {years.map(year => (
-      <div class="year-group">
-        <h3 class="year-header">{year}</h3>
-        <div class="events">
-          {eventsByYear[year].map(event => (
-            <EventCard event={event} />
-          ))}
-        </div>
+    <div class="section-header">
+      <h2 class="section-title display-text">Events</h2>
+      <div class="scroll-indicator">
+        <span>Scroll</span>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
       </div>
-    ))}
-
-    {filteredEvents.length === 0 && (
-      <p class="no-events text-muted">No events to show</p>
-    )}
+    </div>
   </div>
+
+  {years.map(year => (
+    <div class="year-group">
+      <div class="container">
+        <h3 class="year-header">{year}</h3>
+      </div>
+      <div class="events-scroll horizontal-scroll">
+        {eventsByYear[year].map(event => (
+          <EventCard event={event} />
+        ))}
+      </div>
+    </div>
+  ))}
+
+  {filteredEvents.length === 0 && (
+    <div class="container">
+      <p class="no-events text-muted">No events to show</p>
+    </div>
+  )}
 </section>
 
 <style>
   .events-list {
-    padding: var(--space-3xl) 0;
+    padding: var(--space-4xl) 0;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: var(--space-3xl);
   }
 
   .section-title {
-    font-size: var(--text-5xl);
-    margin-bottom: var(--space-3xl);
+    margin-bottom: 0;
   }
 
   .year-group {
-    margin-bottom: var(--space-3xl);
+    margin-bottom: var(--space-4xl);
   }
 
   .year-header {
-    font-size: var(--text-6xl);
+    font-size: var(--text-4xl);
     color: var(--color-muted);
     margin-bottom: var(--space-lg);
-    opacity: 0.3;
+    font-weight: 400;
   }
 
-  .events {
-    display: flex;
-    flex-direction: column;
+  .events-scroll {
+    gap: var(--space-xl);
   }
 
   .no-events {
     padding: var(--space-2xl) 0;
+  }
+
+  @media (max-width: 768px) {
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-md);
+    }
   }
 </style>

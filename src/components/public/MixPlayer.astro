@@ -11,18 +11,30 @@ const { mixes } = Astro.props;
 
 <section class="mixes-section">
   <div class="container">
-    <h2 class="section-title">Mixes</h2>
-
-    {mixes.length > 0 ? (
-      <div class="mixes-grid">
-        {mixes.map(mix => (
-          <MixCard mix={mix} />
-        ))}
-      </div>
-    ) : (
-      <p class="no-mixes text-muted">No mixes yet</p>
-    )}
+    <div class="section-header">
+      <h2 class="section-title display-text">Mixes</h2>
+      {mixes.length > 3 && (
+        <div class="scroll-indicator">
+          <span>Scroll</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </div>
+      )}
+    </div>
   </div>
+
+  {mixes.length > 0 ? (
+    <div class="mixes-scroll horizontal-scroll">
+      {mixes.map(mix => (
+        <MixCard mix={mix} />
+      ))}
+    </div>
+  ) : (
+    <div class="container">
+      <p class="no-mixes text-muted">No mixes yet</p>
+    </div>
+  )}
 </section>
 
 <!-- Global audio player -->
@@ -51,23 +63,42 @@ const { mixes } = Astro.props;
 
 <style>
   .mixes-section {
-    padding: var(--space-3xl) 0;
-    background: var(--color-bg-alt);
+    padding: var(--space-4xl) 0;
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: var(--space-3xl);
   }
 
   .section-title {
-    font-size: var(--text-5xl);
-    margin-bottom: var(--space-2xl);
+    margin-bottom: 0;
   }
 
-  .mixes-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: var(--space-lg);
+  .mixes-scroll {
+    gap: var(--space-xl);
   }
 
   .no-mixes {
     padding: var(--space-2xl) 0;
+    opacity: 0.6;
+  }
+
+  /* Override scroll indicator colors for dark section */
+  .scroll-indicator {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  @media (max-width: 768px) {
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-md);
+    }
   }
 
   /* Global audio player bar */

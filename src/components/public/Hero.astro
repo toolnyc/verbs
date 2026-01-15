@@ -28,29 +28,38 @@ const formattedYear = eventDate.getFullYear();
 ---
 
 <section class="hero" class:list={{ past: isPast }}>
-  <div class="container">
+  <div class="hero-image-wrapper img-hover-reveal">
+    {event.image_url && (
+      <img src={event.image_url} alt={event.title} class="hero-bg-image" />
+    )}
+  </div>
+
+  <div class="container hero-container">
     <header class="hero-header">
-      <p class="date text-uppercase text-sm">{formattedDate} {formattedYear}</p>
-      <h1 class="title">{event.title}</h1>
+      <div class="hero-meta">
+        <span class="date-pill">{formattedDate}</span>
+        <span class="year-pill">{formattedYear}</span>
+      </div>
+      <h1 class="title display-text">{event.title}</h1>
     </header>
 
     <div class="hero-content">
       <div class="hero-info">
         <div class="venue">
-          <p class="venue-name text-2xl">{event.venue_name}</p>
+          <p class="venue-name">{event.venue_name}</p>
           <p class="venue-city text-muted">{event.venue_city}</p>
           {event.venue_link && (
-            <a href={event.venue_link} target="_blank" rel="noopener" class="text-sm">
-              View map
+            <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">
+              View map →
             </a>
           )}
         </div>
 
         <div class="time">
-          <p class="text-lg">{formattedTime}</p>
+          <p class="time-main">{formattedTime}</p>
           {event.time_end && (
             <p class="text-muted text-sm">
-              until {new Date(event.time_end).toLocaleTimeString('en-US', {
+              — {new Date(event.time_end).toLocaleTimeString('en-US', {
                 hour: 'numeric',
                 minute: '2-digit',
               })}
@@ -63,24 +72,20 @@ const formattedYear = eventDate.getFullYear();
             <p class="text-uppercase text-xs text-muted mb-sm">Lineup</p>
             <ul class="dj-list">
               {djs.map(dj => (
-                <li class="dj-name text-lg">{dj.name}</li>
+                <li class="dj-name">{dj.name}</li>
               ))}
             </ul>
           </div>
         )}
 
         {event.description && (
-          <div class="description mt-xl">
+          <div class="description">
             <p>{event.description}</p>
           </div>
         )}
       </div>
 
       <div class="hero-tickets">
-        {event.image_url && (
-          <img src={event.image_url} alt={event.title} class="event-image" />
-        )}
-
         {!isPast && tiers.length > 0 && (
           <div class="tickets">
             {tiers.map(tier => (
@@ -99,41 +104,75 @@ const formattedYear = eventDate.getFullYear();
 
 <style>
   .hero {
-    padding: var(--space-3xl) 0;
-    min-height: 80vh;
+    position: relative;
+    min-height: 100vh;
     display: flex;
-    align-items: center;
+    flex-direction: column;
   }
 
   .hero.past {
     min-height: auto;
-    opacity: 0.5;
+  }
+
+  .hero.past .hero-image-wrapper {
+    opacity: 0.4;
+  }
+
+  .hero-image-wrapper {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 55%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  .hero-bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero-container {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: var(--space-4xl);
+    padding-bottom: var(--space-4xl);
   }
 
   .hero-header {
-    margin-bottom: var(--space-2xl);
+    margin-bottom: var(--space-3xl);
   }
 
-  .date {
-    margin-bottom: var(--space-sm);
+  .hero-meta {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .date-pill,
+  .year-pill {
+    display: inline-block;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--color-fg);
   }
 
   .title {
-    font-size: var(--text-7xl);
-    line-height: 0.95;
-    max-width: 12ch;
+    max-width: 10ch;
   }
 
   .hero-content {
     display: grid;
     grid-template-columns: 1fr;
-    gap: var(--space-2xl);
-  }
-
-  @media (min-width: 768px) {
-    .hero-content {
-      grid-template-columns: 1fr 1fr;
-    }
+    gap: var(--space-3xl);
+    max-width: 600px;
   }
 
   .hero-info {
@@ -143,7 +182,17 @@ const formattedYear = eventDate.getFullYear();
   }
 
   .venue-name {
+    font-size: var(--text-2xl);
     font-weight: 500;
+  }
+
+  .venue-link {
+    display: inline-block;
+    margin-top: var(--space-xs);
+  }
+
+  .time-main {
+    font-size: var(--text-xl);
   }
 
   .dj-list {
@@ -151,12 +200,23 @@ const formattedYear = eventDate.getFullYear();
   }
 
   .dj-name {
-    padding: var(--space-xs) 0;
+    font-size: var(--text-lg);
+    padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border);
+    transition: padding-left 0.2s ease;
+  }
+
+  .dj-name:hover {
+    padding-left: var(--space-sm);
   }
 
   .dj-name:last-child {
     border-bottom: none;
+  }
+
+  .description {
+    max-width: 45ch;
+    line-height: 1.6;
   }
 
   .hero-tickets {
@@ -165,15 +225,36 @@ const formattedYear = eventDate.getFullYear();
     gap: var(--space-lg);
   }
 
-  .event-image {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-  }
-
   .tickets {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+
+  @media (max-width: 1024px) {
+    .hero-image-wrapper {
+      width: 45%;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero {
+      min-height: auto;
+    }
+
+    .hero-image-wrapper {
+      position: relative;
+      width: 100%;
+      height: 50vh;
+      order: -1;
+    }
+
+    .hero-container {
+      padding-top: var(--space-2xl);
+    }
+
+    .title {
+      max-width: none;
+    }
   }
 </style>

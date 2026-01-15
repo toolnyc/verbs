@@ -15,49 +15,60 @@ const formatDuration = (seconds: number | null) => {
 };
 ---
 
-<article class="mix-card" data-audio-url={mix.audio_url}>
-  {mix.cover_image_url ? (
-    <img src={mix.cover_image_url} alt={mix.title} class="cover" />
-  ) : (
-    <div class="cover cover-placeholder">
-      <span class="text-4xl">♫</span>
-    </div>
-  )}
+<article class="mix-card card-hover" data-audio-url={mix.audio_url}>
+  <div class="cover-wrapper img-hover-reveal">
+    {mix.cover_image_url ? (
+      <img src={mix.cover_image_url} alt={mix.title} class="cover" />
+    ) : (
+      <div class="cover cover-placeholder">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+      </div>
+    )}
+    <button class="play-btn" aria-label="Play">
+      <svg class="play-icon" viewBox="0 0 24 24" width="32" height="32">
+        <polygon points="5,3 19,12 5,21" fill="currentColor" />
+      </svg>
+      <svg class="pause-icon" viewBox="0 0 24 24" width="32" height="32" style="display: none;">
+        <rect x="5" y="3" width="4" height="18" fill="currentColor" />
+        <rect x="15" y="3" width="4" height="18" fill="currentColor" />
+      </svg>
+    </button>
+  </div>
 
   <div class="mix-info">
     <h3 class="mix-title">{mix.title}</h3>
     {mix.description && (
-      <p class="mix-description text-sm text-muted">{mix.description}</p>
+      <p class="mix-description text-sm">{mix.description}</p>
     )}
     {mix.duration_seconds && (
-      <p class="mix-duration text-xs text-muted">{formatDuration(mix.duration_seconds)}</p>
+      <p class="mix-duration text-xs">{formatDuration(mix.duration_seconds)}</p>
     )}
   </div>
-
-  <button class="play-btn" aria-label="Play">
-    <svg class="play-icon" viewBox="0 0 24 24" width="24" height="24">
-      <polygon points="5,3 19,12 5,21" fill="currentColor" />
-    </svg>
-    <svg class="pause-icon" viewBox="0 0 24 24" width="24" height="24" style="display: none;">
-      <rect x="5" y="3" width="4" height="18" fill="currentColor" />
-      <rect x="15" y="3" width="4" height="18" fill="currentColor" />
-    </svg>
-  </button>
 </article>
 
 <style>
   .mix-card {
-    display: grid;
-    grid-template-columns: 80px 1fr auto;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    border: 1px solid var(--color-border);
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    color: var(--color-bg);
+  }
+
+  .cover-wrapper {
+    position: relative;
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .cover-wrapper::after {
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .cover {
-    width: 80px;
-    height: 80px;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
   }
 
@@ -65,23 +76,52 @@ const formatDuration = (seconds: number | null) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg-alt);
-    color: var(--color-muted);
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.3);
+  }
+
+  .play-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: none;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 2;
+  }
+
+  .cover-wrapper:hover .play-btn,
+  .mix-card.playing .play-btn {
+    opacity: 1;
+  }
+
+  .play-btn:hover {
+    transform: translate(-50%, -50%) scale(1.1);
   }
 
   .mix-info {
+    padding: var(--space-lg) 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
-    min-width: 0;
   }
 
   .mix-title {
     font-size: var(--text-lg);
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.2;
   }
 
   .mix-description {
@@ -89,20 +129,12 @@ const formatDuration = (seconds: number | null) => {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    opacity: 0.7;
   }
 
-  .play-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .play-btn:hover {
-    transform: scale(1.05);
+  .mix-duration {
+    opacity: 0.5;
+    margin-top: var(--space-xs);
   }
 
   .mix-card.playing .play-icon {
@@ -115,12 +147,7 @@ const formatDuration = (seconds: number | null) => {
 
   @media (max-width: 480px) {
     .mix-card {
-      grid-template-columns: 60px 1fr auto;
-    }
-
-    .cover {
-      width: 60px;
-      height: 60px;
+      width: 240px;
     }
   }
 </style>
