@@ -53,7 +53,7 @@ function isActive(href: string) {
         </nav>
 
         <div class="sidebar-footer">
-          <a href="/" class="back-to-site">← Back to Site</a>
+          <a href="/" class="back-to-site">Back to Site</a>
           <form action="/admin/logout" method="POST">
             <button type="submit" class="logout-btn">Log out</button>
           </form>
@@ -64,13 +64,13 @@ function isActive(href: string) {
       <header class="mobile-header">
         <a href="/" class="mobile-logo">VERBS</a>
         <button class="menu-toggle" aria-label="Toggle menu">
-          <span class="menu-icon"></span>
+          Menu
         </button>
       </header>
 
       <!-- Full screen mobile menu (hidden until opened) -->
       <div class="mobile-menu" id="mobile-menu">
-        <button class="menu-close" aria-label="Close menu">×</button>
+        <button class="menu-close" aria-label="Close menu">Close</button>
         <nav class="mobile-nav">
           {navItems.map(item => (
             <a
@@ -82,7 +82,7 @@ function isActive(href: string) {
           ))}
         </nav>
         <div class="mobile-menu-footer">
-          <a href="/" class="mobile-back-link">← Back to Site</a>
+          <a href="/" class="mobile-back-link">Back to Site</a>
           <form action="/admin/logout" method="POST">
             <button type="submit" class="mobile-logout-btn">Log out</button>
           </form>
@@ -209,44 +209,22 @@ function isActive(href: string) {
   }
 
   .menu-toggle {
-    width: 44px;
-    height: 44px;
     background: transparent;
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    padding: var(--space-sm) var(--space-md);
+    color: var(--color-bg);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    font-weight: 700;
   }
 
   .menu-toggle:hover {
     background: transparent;
-  }
-
-  .menu-icon {
-    width: 24px;
-    height: 2px;
-    background: var(--color-bg);
-    position: relative;
-  }
-
-  .menu-icon::before,
-  .menu-icon::after {
-    content: '';
-    position: absolute;
-    width: 24px;
-    height: 2px;
-    background: var(--color-bg);
-    left: 0;
-  }
-
-  .menu-icon::before {
-    top: -8px;
-  }
-
-  .menu-icon::after {
-    top: 8px;
+    opacity: 0.7;
   }
 
   /* Mobile menu styles */
@@ -254,17 +232,17 @@ function isActive(href: string) {
     position: absolute;
     top: var(--space-md);
     right: var(--space-md);
-    width: 44px;
-    height: 44px;
     background: transparent;
     border: none;
     color: var(--color-bg);
-    font-size: var(--text-3xl);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
+    padding: var(--space-sm) var(--space-md);
   }
 
   .menu-close:hover {
@@ -371,7 +349,7 @@ function isActive(href: string) {
     font-weight: 700;
     opacity: 0.7;
     transition: opacity 0.15s, background 0.15s;
-    border-radius: 4px;
+    border-radius: 2px;
   }
 
   .nav-item::after {

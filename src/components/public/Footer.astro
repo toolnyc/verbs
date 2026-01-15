@@ -1,0 +1,454 @@
+---
+// Footer component - pinned at bottom, content scrolls beneath
+interface Props {
+  nextEventDate?: string | null;
+}
+
+const { nextEventDate } = Astro.props;
+---
+
+<footer class="site-footer" data-next-event={nextEventDate || ''}>
+  <!-- Desktop footer - expandable -->
+  <div class="footer-desktop" id="footer-desktop">
+    <!-- Main row: always visible -->
+    <div class="footer-bar footer-main-row">
+      <form class="newsletter-form" id="newsletter-form-desktop">
+        <input type="email" name="email" placeholder="Email for updates" required />
+        <button type="submit">Subscribe</button>
+        <span class="newsletter-status"></span>
+      </form>
+
+      <a href="/" class="footer-home">VERBS</a>
+
+      <div class="footer-right">
+        <div class="footer-countdown">
+          <span class="countdown-label">Next party</span>
+          <span class="countdown-value" id="countdown-desktop">--</span>
+        </div>
+        <button class="footer-expand-toggle" id="footer-expand-toggle" aria-label="Expand menu">
+          <span class="expand-icon">+</span>
+          <span class="collapse-icon">−</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Second row: hidden by default -->
+    <div class="footer-bar footer-second-row" id="footer-second-row">
+      <a href="/legal">Legal</a>
+      <a href="/admin">Admin</a>
+    </div>
+  </div>
+
+  <!-- Mobile footer bar -->
+  <div class="footer-bar footer-mobile">
+    <button class="footer-menu-toggle" id="footer-menu-toggle">Menu</button>
+    <div class="footer-countdown">
+      <span class="countdown-label">Next party</span>
+      <span class="countdown-value" id="countdown-mobile">--</span>
+    </div>
+  </div>
+</footer>
+
+<!-- Full screen mobile menu -->
+<div class="footer-menu-overlay" id="footer-menu-overlay">
+  <button class="footer-menu-close" id="footer-menu-close">Close</button>
+  <nav class="footer-menu-nav">
+    <a href="/">Home</a>
+    <a href="/legal">Legal</a>
+    <a href="/admin">Admin</a>
+  </nav>
+  <form class="newsletter-form newsletter-form-overlay" id="newsletter-form-overlay">
+    <input type="email" name="email" placeholder="Email for updates" required />
+    <button type="submit">Subscribe</button>
+    <span class="newsletter-status"></span>
+  </form>
+  <div class="footer-countdown-overlay">
+    <span class="countdown-label">Next party</span>
+    <span class="countdown-value" id="countdown-overlay">--</span>
+  </div>
+</div>
+
+<script>
+  function updateCountdown() {
+    const footer = document.querySelector('.site-footer') as HTMLElement;
+    const nextEventDate = footer?.dataset.nextEvent;
+
+    if (!nextEventDate) {
+      document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+        if (el) el.textContent = 'TBA';
+      });
+      return;
+    }
+
+    const now = new Date();
+    const eventDate = new Date(nextEventDate);
+    const diff = eventDate.getTime() - now.getTime();
+
+    if (diff <= 0) {
+      document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+        if (el) el.textContent = 'Now!';
+      });
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    let countdownText = '';
+    if (days > 0) {
+      countdownText = `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      countdownText = `${hours}h ${minutes}m ${seconds}s`;
+    } else {
+      countdownText = `${minutes}m ${seconds}s`;
+    }
+
+    document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+      if (el) el.textContent = countdownText;
+    });
+  }
+
+  // Update immediately and then every second
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+
+  // Desktop footer expand/collapse
+  const footerDesktop = document.getElementById('footer-desktop');
+  const expandToggle = document.getElementById('footer-expand-toggle');
+
+  expandToggle?.addEventListener('click', () => {
+    footerDesktop?.classList.toggle('expanded');
+  });
+
+  // Mobile menu toggle
+  const menuToggle = document.getElementById('footer-menu-toggle');
+  const menuClose = document.getElementById('footer-menu-close');
+  const menuOverlay = document.getElementById('footer-menu-overlay');
+
+  menuToggle?.addEventListener('click', () => {
+    menuOverlay?.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+
+  menuClose?.addEventListener('click', () => {
+    menuOverlay?.classList.remove('open');
+    document.body.style.overflow = '';
+  });
+
+  // Close menu when clicking a link
+  menuOverlay?.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      menuOverlay?.classList.remove('open');
+      document.body.style.overflow = '';
+    });
+  });
+
+  // Newsletter form handling
+  document.querySelectorAll('.newsletter-form').forEach(form => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formEl = e.target as HTMLFormElement;
+      const emailInput = formEl.querySelector('input[name="email"]') as HTMLInputElement;
+      const statusEl = formEl.querySelector('.newsletter-status') as HTMLElement;
+      const submitBtn = formEl.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+      const email = emailInput.value;
+      submitBtn.disabled = true;
+      statusEl.textContent = '...';
+
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        if (res.ok) {
+          statusEl.textContent = 'Subscribed!';
+          emailInput.value = '';
+        } else {
+          const data = await res.json();
+          statusEl.textContent = data.error || 'Error';
+        }
+      } catch {
+        statusEl.textContent = 'Error';
+      }
+
+      submitBtn.disabled = false;
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    });
+  });
+</script>
+
+<style>
+  .site-footer {
+    position: fixed;
+    bottom: var(--space-md);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    background: var(--color-fg);
+    color: var(--color-bg);
+    border-radius: 2px;
+    width: calc(100% - var(--space-xl) * 2);
+    max-width: 900px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    height: auto;
+    min-height: 56px;
+  }
+
+  .footer-desktop {
+    display: block;
+  }
+
+  .footer-mobile {
+    display: none;
+  }
+
+  .newsletter-form {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .newsletter-form input {
+    background: transparent;
+    border: 1px solid var(--color-bg);
+    color: var(--color-bg);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
+    width: 180px;
+  }
+
+  .newsletter-form input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .newsletter-form input:focus {
+    outline: 1px solid var(--color-bg);
+    outline-offset: 1px;
+  }
+
+  .newsletter-form button {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: 1px solid var(--color-bg);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
+  }
+
+  .newsletter-form button:hover {
+    background: transparent;
+    color: var(--color-bg);
+  }
+
+  .newsletter-status {
+    font-size: var(--text-xs);
+    opacity: 0.7;
+  }
+
+  .footer-home {
+    font-weight: 700;
+    font-size: var(--text-base);
+    letter-spacing: 0.05em;
+  }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+  }
+
+  .footer-countdown {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-base);
+  }
+
+  .countdown-label {
+    opacity: 0.6;
+  }
+
+  .countdown-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Desktop expand toggle */
+  .footer-expand-toggle {
+    background: transparent;
+    border: 1px solid var(--color-bg);
+    color: var(--color-bg);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-base);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .footer-expand-toggle:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  .footer-expand-toggle .collapse-icon {
+    display: none;
+  }
+
+  .footer-desktop.expanded .footer-expand-toggle .expand-icon {
+    display: none;
+  }
+
+  .footer-desktop.expanded .footer-expand-toggle .collapse-icon {
+    display: inline;
+  }
+
+  /* Second row - hidden by default */
+  .footer-second-row {
+    display: none;
+    justify-content: center;
+    gap: var(--space-xl);
+    min-height: 44px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .footer-second-row a {
+    font-size: var(--text-sm);
+    opacity: 0.7;
+  }
+
+  .footer-second-row a:hover {
+    opacity: 1;
+  }
+
+  .footer-desktop.expanded .footer-second-row {
+    display: flex;
+  }
+
+  /* Mobile footer */
+  .footer-menu-toggle {
+    background: transparent;
+    border: none;
+    padding: var(--space-sm) 0;
+    font-size: var(--text-base);
+    cursor: pointer;
+    color: var(--color-bg);
+  }
+
+  .footer-menu-toggle:hover {
+    background: transparent;
+    color: var(--color-bg);
+    opacity: 0.7;
+  }
+
+  /* Full screen overlay */
+  .footer-menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--color-fg);
+    color: var(--color-bg);
+    z-index: 1100;
+    flex-direction: column;
+    padding: var(--space-xl);
+  }
+
+  .footer-menu-overlay.open {
+    display: flex;
+  }
+
+  .footer-menu-close {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    background: transparent;
+    border: none;
+    color: var(--color-bg);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .footer-menu-close:hover {
+    background: transparent;
+    opacity: 0.7;
+  }
+
+  .footer-menu-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: var(--space-3xl);
+    flex: 1;
+  }
+
+  .footer-menu-nav a {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.7;
+    padding: var(--space-sm) 0;
+  }
+
+  .footer-menu-nav a::after {
+    display: none;
+  }
+
+  .footer-menu-nav a:hover {
+    opacity: 1;
+  }
+
+  .footer-countdown-overlay {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    padding-top: var(--space-xl);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .footer-countdown-overlay .countdown-label {
+    opacity: 0.6;
+  }
+
+  .newsletter-form-overlay {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+    margin-top: var(--space-xl);
+  }
+
+  .newsletter-form-overlay input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-base);
+  }
+
+  .newsletter-form-overlay button {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-base);
+  }
+
+  @media (max-width: 768px) {
+    .footer-desktop {
+      display: none;
+    }
+
+    .footer-mobile {
+      display: flex;
+    }
+  }
+</style>

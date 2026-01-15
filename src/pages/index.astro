@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import VerbGrid from '../components/public/VerbGrid.astro';
+import Footer from '../components/public/Footer.astro';
 import { getAllEvents, getPublishedEvents } from '../lib/supabase';
 import { listFlyers } from '../lib/blob';
 
@@ -28,36 +29,20 @@ const upcomingEvents = events
   .filter(e => new Date(e.date) >= now)
   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 const nextEventId = upcomingEvents.length > 0 ? upcomingEvents[0].id : null;
+const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
+
 ---
 
 <Base title="VERBS" description="Events and mixes from VERBS collective">
   <main>
     <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} />
-
-    <footer class="site-footer">
-      <div class="container flex justify-between items-center">
-        <a href="/" class="footer-logo no-underline">VERBS</a>
-        <p class="text-sm text-muted">&copy; {new Date().getFullYear()}</p>
-      </div>
-    </footer>
   </main>
+  <Footer nextEventDate={nextEventDate} />
 </Base>
 
 <style>
   main {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .site-footer {
-    margin-top: auto;
-    padding: var(--space-xl) 0;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .footer-logo {
-    font-size: var(--text-lg);
-    font-weight: 500;
   }
 </style>

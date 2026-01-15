@@ -1,6 +1,9 @@
 ---
 import { Font } from 'astro:assets';
+import { ViewTransitions } from 'astro:transitions';
 import '../styles/global.css';
+import PersistentPlayer from '../components/public/PersistentPlayer.astro';
+import { getPublishedMixes } from '../lib/supabase';
 
 interface Props {
   title?: string;
@@ -13,6 +16,9 @@ const {
 } = Astro.props;
 
 const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world/';
+
+// Fetch mixes for the persistent player
+const mixes = await getPublishedMixes();
 ---
 
 <!doctype html>
@@ -27,9 +33,11 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <meta property="og:type" content="website" />
     <meta property="og:url" content={siteUrl} />
     <Font cssVariable="--font-sans" preload />
+    <ViewTransitions />
     <title>{title}</title>
   </head>
   <body>
+    <PersistentPlayer mixes={mixes} />
     <slot />
   </body>
 </html>

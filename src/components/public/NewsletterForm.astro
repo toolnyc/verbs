@@ -20,9 +20,6 @@
           />
           <button type="submit" class="submit-btn">
             <span class="btn-text">Subscribe</span>
-            <svg class="btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
           </button>
         </div>
         <p class="form-message" id="formMessage"></p>
@@ -70,17 +67,8 @@
   .submit-btn {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
     padding: var(--space-md) var(--space-xl);
     white-space: nowrap;
-  }
-
-  .btn-arrow {
-    transition: transform 0.2s ease;
-  }
-
-  .submit-btn:hover .btn-arrow {
-    transform: translateX(4px);
   }
 
   .form-message {

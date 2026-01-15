@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import Footer from '../../components/public/Footer.astro';
 import { getEventWithDetails } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -42,6 +43,9 @@ const formattedTime = eventDate.toLocaleTimeString('en-US', {
 });
 
 const formattedYear = eventDate.getFullYear();
+
+// For countdown - use this event if it's in the future
+const nextEventDate = !isPast ? event.date : null;
 ---
 
 <Base title={`${event.title} - VERBS`} description={event.description || `${event.title} at ${event.venue_name}`}>
@@ -51,7 +55,7 @@ const formattedYear = eventDate.getFullYear();
         Draft &mdash; Only visible to logged in users
       </div>
     )}
-    <a href="/" class="back-link no-underline">&larr; Back</a>
+    <a href="/" class="back-link no-underline">Back</a>
 
     <div class="event-layout">
       <div class="event-image-wrapper img-hover-reveal">
@@ -112,13 +116,8 @@ const formattedYear = eventDate.getFullYear();
       </div>
     </div>
 
-    <footer class="site-footer">
-      <div class="container flex justify-between items-center">
-        <a href="/" class="footer-logo no-underline">VERBS</a>
-        <p class="text-sm text-muted">&copy; {new Date().getFullYear()}</p>
-      </div>
-    </footer>
   </main>
+  <Footer nextEventDate={nextEventDate} />
 </Base>
 
 <style>
@@ -126,13 +125,14 @@ const formattedYear = eventDate.getFullYear();
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    padding-bottom: var(--space-4xl);
   }
 
   .draft-banner {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 96px; /* Below the floating mixplayer */
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 200;
     padding: var(--space-sm) var(--space-md);
     background: var(--color-fg);
@@ -140,11 +140,13 @@ const formattedYear = eventDate.getFullYear();
     text-align: center;
     font-size: var(--text-sm);
     text-transform: uppercase;
+    border-radius: 2px;
+    width: auto;
   }
 
   .back-link {
     position: fixed;
-    top: var(--space-lg);
+    top: 96px; /* Below the floating mixplayer */
     left: var(--space-lg);
     z-index: 100;
     font-size: var(--text-sm);
@@ -152,7 +154,14 @@ const formattedYear = eventDate.getFullYear();
     padding: var(--space-sm) var(--space-md);
     background: var(--color-bg);
     border: 1px solid var(--color-fg);
+    border-radius: 2px;
     transition: background 0.2s, color 0.2s;
+  }
+
+  /* When draft banner is present, move back link down */
+  .draft-banner ~ .back-link,
+  .event-page:has(.draft-banner) .back-link {
+    top: 140px;
   }
 
   .back-link:hover {
@@ -245,16 +254,6 @@ const formattedYear = eventDate.getFullYear();
   .description {
     max-width: 45ch;
     line-height: 1.6;
-  }
-
-  .site-footer {
-    padding: var(--space-xl) 0;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .footer-logo {
-    font-size: var(--text-lg);
-    font-weight: 500;
   }
 
   @media (max-width: 1024px) {

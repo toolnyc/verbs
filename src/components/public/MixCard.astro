@@ -15,25 +15,18 @@ const formatDuration = (seconds: number | null) => {
 };
 ---
 
-<article class="mix-card card-hover" data-audio-url={mix.audio_url}>
+<article class="mix-card card-hover" data-mix-id={mix.id} data-audio-url={mix.audio_url}>
   <div class="cover-wrapper img-hover-reveal">
     {mix.cover_image_url ? (
       <img src={mix.cover_image_url} alt={mix.title} class="cover" />
     ) : (
       <div class="cover cover-placeholder">
-        <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
+        <span class="placeholder-text">Mix</span>
       </div>
     )}
     <button class="play-btn" aria-label="Play">
-      <svg class="play-icon" viewBox="0 0 24 24" width="32" height="32">
-        <polygon points="5,3 19,12 5,21" fill="currentColor" />
-      </svg>
-      <svg class="pause-icon" viewBox="0 0 24 24" width="32" height="32" style="display: none;">
-        <rect x="5" y="3" width="4" height="18" fill="currentColor" />
-        <rect x="15" y="3" width="4" height="18" fill="currentColor" />
-      </svg>
+      <span class="play-icon">Play</span>
+      <span class="pause-icon" style="display: none;">Pause</span>
     </button>
   </div>
 
@@ -82,24 +75,29 @@ const formatDuration = (seconds: number | null) => {
     color: rgba(255, 255, 255, 0.3);
   }
 
+  .placeholder-text {
+    font-size: var(--text-lg);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
   .play-btn {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
+    padding: var(--space-sm) var(--space-lg);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
     background: var(--color-bg);
     color: var(--color-fg);
     border: none;
     opacity: 0;
     transition: opacity 0.3s ease, transform 0.3s ease;
     z-index: 2;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
   }
 
   .cover-wrapper:hover .play-btn,
@@ -151,3 +149,18 @@ const formatDuration = (seconds: number | null) => {
     }
   }
 </style>
+
+<script>
+  // Dispatch playMix event to global player
+  document.querySelectorAll('.mix-card').forEach(card => {
+    const playBtn = card.querySelector('.play-btn');
+    const mixId = (card as HTMLElement).dataset.mixId;
+
+    playBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('playMix', {
+        detail: { mixId }
+      }));
+    });
+  });
+</script>

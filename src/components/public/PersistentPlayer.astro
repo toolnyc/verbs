@@ -1,0 +1,438 @@
+---
+import type { Mix } from '../../lib/supabase';
+
+interface Props {
+  mixes: Mix[];
+}
+
+const { mixes } = Astro.props;
+const firstMix = mixes[0];
+---
+
+{mixes.length > 0 && (
+  <div class="persistent-player" id="persistentPlayer" data-mixes={JSON.stringify(mixes)}>
+    <audio id="globalAudio" transition:persist="audio"></audio>
+
+    <!-- Expanded player bar -->
+    <div class="player-bar player-expanded">
+      <div class="player-controls">
+        <button class="player-btn player-prev" aria-label="Previous">Prev</button>
+        <button class="player-btn player-play" aria-label="Play">
+          <span class="play-icon">Play</span>
+          <span class="pause-icon">Pause</span>
+        </button>
+        <button class="player-btn player-next" aria-label="Next">Next</button>
+      </div>
+
+      <div class="player-info">
+        <span class="player-title">{firstMix.title}</span>
+      </div>
+
+      <div class="player-right">
+        <span class="player-time text-xs">0:00</span>
+        <input type="range" class="player-progress" min="0" max="100" value="0" step="0.1" />
+        <button class="player-fold-toggle" aria-label="Collapse player">
+          <span class="fold-icon">−</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsed player bar -->
+    <div class="player-bar player-collapsed">
+      <button class="player-btn player-play-mini" aria-label="Play">
+        <span class="play-icon">▶</span>
+        <span class="pause-icon">❙❙</span>
+      </button>
+      <span class="player-title-mini">{firstMix.title}</span>
+      <button class="player-unfold-toggle" aria-label="Expand player">
+        <span class="unfold-icon">+</span>
+      </button>
+    </div>
+  </div>
+)}
+
+<style>
+  .persistent-player {
+    position: fixed;
+    top: var(--space-md);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--color-fg);
+    color: var(--color-bg);
+    border-radius: 2px;
+    width: calc(100% - var(--space-xl) * 2);
+    max-width: 900px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .player-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+    height: auto;
+    min-height: 56px;
+  }
+
+  /* Expanded state (default) */
+  .player-expanded {
+    display: flex;
+  }
+
+  .player-collapsed {
+    display: none;
+  }
+
+  .persistent-player.folded .player-expanded {
+    display: none;
+  }
+
+  .persistent-player.folded .player-collapsed {
+    display: flex;
+    min-height: 44px;
+    gap: var(--space-sm);
+  }
+
+  .player-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
+  .player-btn {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .player-btn:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  .player-play .pause-icon,
+  .player-play-mini .pause-icon {
+    display: none;
+  }
+
+  .persistent-player.playing .player-play .play-icon,
+  .persistent-player.playing .player-play-mini .play-icon {
+    display: none;
+  }
+
+  .persistent-player.playing .player-play .pause-icon,
+  .persistent-player.playing .player-play-mini .pause-icon {
+    display: inline;
+  }
+
+  .player-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .player-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+
+  .player-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-shrink: 0;
+  }
+
+  .player-time {
+    opacity: 0.7;
+    min-width: 70px;
+    text-align: right;
+  }
+
+  .player-progress {
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.3);
+    height: 4px;
+    border-radius: 2px;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 100px;
+  }
+
+  .player-progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--color-bg);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* Fold/unfold toggle buttons */
+  .player-fold-toggle,
+  .player-unfold-toggle {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-base);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .player-fold-toggle:hover,
+  .player-unfold-toggle:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  /* Collapsed mini player */
+  .player-play-mini {
+    padding: var(--space-xs);
+    min-width: 24px;
+    font-size: 10px;
+  }
+
+  .player-title-mini {
+    flex: 1;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.8;
+  }
+
+  @media (max-width: 768px) {
+    .player-progress {
+      width: 60px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .player-prev,
+    .player-next {
+      display: none;
+    }
+
+    .player-progress {
+      display: none;
+    }
+
+    .player-time {
+      min-width: auto;
+    }
+  }
+</style>
+
+<script>
+  interface Mix {
+    id: string;
+    title: string;
+    description: string | null;
+    audio_url: string;
+    cover_image_url: string | null;
+    duration_seconds: number | null;
+  }
+
+  interface PlayerState {
+    currentMixId: string | null;
+    currentTime: number;
+    isPlaying: boolean;
+    isFolded: boolean;
+  }
+
+  const STORAGE_KEY = 'verbsPlayerState';
+  const FOLD_STORAGE_KEY = 'verbsPlayerFolded';
+
+  function initPlayer() {
+    const playerEl = document.getElementById('persistentPlayer');
+    if (!playerEl) return;
+
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    const mixes: Mix[] = JSON.parse(playerEl.dataset.mixes || '[]');
+
+    if (mixes.length === 0) return;
+
+    const titleEl = playerEl.querySelector('.player-title')!;
+    const titleMiniEl = playerEl.querySelector('.player-title-mini')!;
+    const timeEl = playerEl.querySelector('.player-time')!;
+    const progressEl = playerEl.querySelector('.player-progress') as HTMLInputElement;
+    const playBtn = playerEl.querySelector('.player-play')!;
+    const playMiniBtn = playerEl.querySelector('.player-play-mini')!;
+    const prevBtn = playerEl.querySelector('.player-prev')!;
+    const nextBtn = playerEl.querySelector('.player-next')!;
+    const foldBtn = playerEl.querySelector('.player-fold-toggle')!;
+    const unfoldBtn = playerEl.querySelector('.player-unfold-toggle')!;
+
+    let currentIndex = 0;
+
+    function updateBodyPadding() {
+      const isFolded = playerEl.classList.contains('folded');
+      // Account for top offset (--space-md ~16px) + bar height + some breathing room
+      document.body.style.paddingTop = isFolded ? '76px' : '88px';
+    }
+
+    function toggleFold() {
+      playerEl.classList.toggle('folded');
+      updateBodyPadding();
+      sessionStorage.setItem(FOLD_STORAGE_KEY, playerEl.classList.contains('folded') ? 'true' : 'false');
+    }
+
+    // Restore fold state
+    const savedFoldState = sessionStorage.getItem(FOLD_STORAGE_KEY);
+    if (savedFoldState === 'true') {
+      playerEl.classList.add('folded');
+    }
+
+    // Add body padding for the player
+    updateBodyPadding();
+
+    function formatTime(seconds: number): string {
+      if (!seconds || !isFinite(seconds)) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function saveState() {
+      const state: PlayerState = {
+        currentMixId: mixes[currentIndex].id,
+        currentTime: audio.currentTime || 0,
+        isPlaying: !audio.paused
+      };
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function loadState(): PlayerState | null {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    }
+
+    function updateUI() {
+      const isPlaying = !audio.paused;
+      playerEl.classList.toggle('playing', isPlaying);
+    }
+
+    function updateProgress() {
+      const current = formatTime(audio.currentTime);
+      const duration = formatTime(audio.duration);
+      const percent = (audio.currentTime / audio.duration) * 100 || 0;
+
+      timeEl.textContent = `${current} / ${duration}`;
+      progressEl.value = String(percent);
+    }
+
+    function selectMix(index: number, autoPlay = false) {
+      if (index < 0 || index >= mixes.length) return;
+
+      const mix = mixes[index];
+      currentIndex = index;
+
+      titleEl.textContent = mix.title;
+      titleMiniEl.textContent = mix.title;
+
+      if (audio.src !== mix.audio_url) {
+        audio.src = mix.audio_url;
+      }
+
+      if (autoPlay) {
+        audio.play();
+      }
+
+      updateUI();
+      saveState();
+    }
+
+    function togglePlay() {
+      if (!audio.src) {
+        audio.src = mixes[currentIndex].audio_url;
+      }
+
+      if (audio.paused) {
+        audio.play();
+      } else {
+        audio.pause();
+      }
+      updateUI();
+      saveState();
+    }
+
+    function playNext() {
+      const next = (currentIndex + 1) % mixes.length;
+      selectMix(next, true);
+    }
+
+    function playPrev() {
+      const prev = currentIndex <= 0 ? mixes.length - 1 : currentIndex - 1;
+      selectMix(prev, true);
+    }
+
+    function seekTo(percent: number) {
+      if (audio.duration) {
+        audio.currentTime = (percent / 100) * audio.duration;
+        saveState();
+      }
+    }
+
+    // Event listeners
+    playBtn.addEventListener('click', togglePlay);
+    playMiniBtn.addEventListener('click', togglePlay);
+    prevBtn.addEventListener('click', playPrev);
+    nextBtn.addEventListener('click', playNext);
+    progressEl.addEventListener('input', () => seekTo(Number(progressEl.value)));
+    foldBtn.addEventListener('click', toggleFold);
+    unfoldBtn.addEventListener('click', toggleFold);
+
+    // Audio events
+    audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('play', () => { updateUI(); saveState(); });
+    audio.addEventListener('pause', () => { updateUI(); saveState(); });
+    audio.addEventListener('ended', playNext);
+
+    // View Transitions state persistence
+    document.addEventListener('astro:before-swap', saveState);
+    document.addEventListener('astro:after-swap', () => {
+      setTimeout(() => initPlayer(), 0);
+    });
+
+    // Restore state on load
+    const savedState = loadState();
+    if (savedState?.currentMixId) {
+      const index = mixes.findIndex(m => m.id === savedState.currentMixId);
+      if (index >= 0) {
+        currentIndex = index;
+        titleEl.textContent = mixes[index].title;
+        titleMiniEl.textContent = mixes[index].title;
+
+        if (savedState.isPlaying || savedState.currentTime > 0) {
+          audio.src = mixes[index].audio_url;
+          if (savedState.currentTime > 0) {
+            audio.currentTime = savedState.currentTime;
+          }
+          if (savedState.isPlaying) {
+            audio.play().catch(() => {});
+          }
+        }
+
+        updateUI();
+      }
+    }
+  }
+
+  initPlayer();
+</script>

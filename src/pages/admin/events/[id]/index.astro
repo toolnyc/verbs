@@ -363,9 +363,9 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           <h2 class="admin-card-title">Quick Actions</h2>
         </div>
         <div class="quick-actions">
-          <a href={`/admin/events/${id}/orders`} class="action-link">View Orders →</a>
+          <a href={`/admin/events/${id}/orders`} class="action-link">View Orders</a>
           {event.status === 'published' && (
-            <a href="/" target="_blank" class="action-link">View on Site →</a>
+            <a href="/" target="_blank" class="action-link">View on Site</a>
           )}
         </div>
       </div>
