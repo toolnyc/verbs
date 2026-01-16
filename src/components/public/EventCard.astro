@@ -38,7 +38,7 @@ const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
     )}
     <div class="event-date-overlay">
       <span class="date-day">{eventDate.getDate()}</span>
-      <span class="date-month text-uppercase">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+      <span class="date-month">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
     </div>
   </div>
 

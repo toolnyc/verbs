@@ -105,7 +105,7 @@ const nextEventDate = !isPast ? event.date : null;
 
           {djs.length > 0 && (
             <div class="lineup">
-              <p class="text-uppercase text-xs text-muted mb-sm">Lineup</p>
+              <p class="text-xs text-muted mb-sm">Lineup</p>
               <ul class="dj-list">
                 {djs.map((dj: any) => (
                   <li class="dj-name">
@@ -131,7 +131,7 @@ const nextEventDate = !isPast ? event.date : null;
 
           {!isPast && tiers.length > 0 && (
             <div class="tickets">
-              <p class="text-uppercase text-xs text-muted mb-sm">Tickets</p>
+              <p class="text-xs text-muted mb-sm">Tickets</p>
               <div class="ticket-list">
                 {tiers.map(tier => (
                   <TicketTier tier={tier} eventId={event.id} />
@@ -172,7 +172,6 @@ const nextEventDate = !isPast ? event.date : null;
     color: var(--color-bg);
     text-align: center;
     font-size: var(--text-sm);
-    text-transform: uppercase;
     border-radius: 2px;
     width: auto;
   }
@@ -183,7 +182,6 @@ const nextEventDate = !isPast ? event.date : null;
     left: var(--space-lg);
     z-index: 100;
     font-size: var(--text-sm);
-    text-transform: uppercase;
     padding: var(--space-sm) var(--space-md);
     background: var(--color-bg);
     border: 1px solid var(--color-fg);
@@ -241,7 +239,6 @@ const nextEventDate = !isPast ? event.date : null;
   .year-pill {
     display: inline-block;
     font-size: var(--text-xs);
-    text-transform: uppercase;
     padding: var(--space-xs) var(--space-md);
     border: 1px solid var(--color-fg);
   }

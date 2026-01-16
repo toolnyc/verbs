@@ -34,6 +34,7 @@ export interface Event {
   venue_city: string;
   venue_link: string | null;
   image_url: string | null;
+  flyer_url: string | null;
   status: 'draft' | 'published' | 'archived';
   created_at: string;
   updated_at: string;

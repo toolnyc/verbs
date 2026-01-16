@@ -1,5 +1,6 @@
 ---
 import Admin from '../../../../layouts/Admin.astro';
+import FileUpload from '../../../../components/admin/FileUpload.astro';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { createProductAndPrice, updatePrice } from '../../../../lib/stripe';
 
@@ -66,6 +67,8 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         venue_name: formData.get('venue_name'),
         venue_city: formData.get('venue_city'),
         venue_link: formData.get('venue_link') || null,
+        image_url: formData.get('image_url') || null,
+        flyer_url: formData.get('flyer_url') || null,
         status: formData.get('status'),
         updated_at: new Date().toISOString(),
       })
@@ -240,6 +243,21 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
         <div class="form-group">
           <label for="description" class="form-label">Description</label>
           <textarea id="description" name="description" rows="4">{event.description}</textarea>
+        </div>
+
+        <div class="form-row">
+          <FileUpload
+            name="image_url"
+            type="image"
+            currentUrl={event.image_url}
+            label="Event Image"
+          />
+          <FileUpload
+            name="flyer_url"
+            type="image"
+            currentUrl={event.flyer_url}
+            label="Event Flyer"
+          />
         </div>
 
         <div class="form-row">
