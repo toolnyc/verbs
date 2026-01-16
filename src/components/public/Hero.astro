@@ -19,10 +19,19 @@ const formattedDate = eventDate.toLocaleDateString('en-US', {
   day: 'numeric',
 });
 
-const formattedTime = eventDate.toLocaleTimeString('en-US', {
-  hour: 'numeric',
+// Format time in 24-hour military format with timezone
+const formattedTime = eventDate.toLocaleTimeString('en-GB', {
+  hour: '2-digit',
   minute: '2-digit',
+  hour12: false,
+  timeZone: event.timezone || 'America/New_York',
 });
+
+// Get short timezone abbreviation
+const timezoneAbbr = new Intl.DateTimeFormat('en-US', {
+  timeZone: event.timezone || 'America/New_York',
+  timeZoneName: 'short',
+}).formatToParts(eventDate).find(p => p.type === 'timeZoneName')?.value || '';
 
 const formattedYear = eventDate.getFullYear();
 ---
@@ -56,23 +65,29 @@ const formattedYear = eventDate.getFullYear();
         </div>
 
         <div class="time">
-          <p class="time-main">{formattedTime}</p>
-          {event.time_end && (
-            <p class="text-muted text-sm">
-              — {new Date(event.time_end).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
+          <p class="time-main">{formattedTime}{event.time_end && ` — ${new Date(event.time_end).toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: event.timezone || 'America/New_York',
+          })}`} <span class="text-muted">{timezoneAbbr}</span></p>
         </div>
 
         {djs.length > 0 && (
           <div class="lineup">
             <p class="text-uppercase text-xs text-muted mb-sm">Lineup</p>
             <ul class="dj-list">
-              {djs.map(dj => (
-                <li class="dj-name">{dj.name}</li>
+              {djs.map((dj: any) => (
+                <li class="dj-name">
+                  {dj.name}
+                  {(dj.slot_start || dj.slot_end) && (
+                    <span class="dj-time text-muted">
+                      {dj.slot_start && dj.slot_start.slice(0, 5)}
+                      {dj.slot_start && dj.slot_end && ' — '}
+                      {dj.slot_end && dj.slot_end.slice(0, 5)}
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
           </div>
@@ -203,6 +218,10 @@ const formattedYear = eventDate.getFullYear();
     padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border);
     transition: padding-left 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
   }
 
   .dj-name:hover {
@@ -211,6 +230,11 @@ const formattedYear = eventDate.getFullYear();
 
   .dj-name:last-child {
     border-bottom: none;
+  }
+
+  .dj-time {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
   }
 
   .description {

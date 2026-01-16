@@ -13,41 +13,38 @@ const firstMix = mixes[0];
   <div class="persistent-player" id="persistentPlayer" data-mixes={JSON.stringify(mixes)}>
     <audio id="globalAudio" transition:persist="audio"></audio>
 
-    <!-- Expanded player bar -->
+    <!-- Expanded player bar - controls focused -->
     <div class="player-bar player-expanded">
-      <div class="player-controls">
-        <button class="player-btn player-prev" aria-label="Previous">Prev</button>
-        <button class="player-btn player-play" aria-label="Play">
-          <span class="play-icon">Play</span>
-          <span class="pause-icon">Pause</span>
-        </button>
-        <button class="player-btn player-next" aria-label="Next">Next</button>
-      </div>
-
-      <div class="player-info">
-        <span class="player-title">{firstMix.title}</span>
-      </div>
-
-      <div class="player-right">
-        <span class="player-time text-xs">0:00</span>
-        <input type="range" class="player-progress" min="0" max="100" value="0" step="0.1" />
-        <button class="player-fold-toggle" aria-label="Collapse player">
-          <span class="fold-icon">−</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Collapsed player bar -->
-    <div class="player-bar player-collapsed">
-      <button class="player-btn player-play-mini" aria-label="Play">
+      <button class="player-btn player-prev" aria-label="Previous">◀</button>
+      <button class="player-btn player-play" aria-label="Play">
         <span class="play-icon">▶</span>
         <span class="pause-icon">❙❙</span>
       </button>
-      <span class="player-title-mini">{firstMix.title}</span>
-      <button class="player-unfold-toggle" aria-label="Expand player">
-        <span class="unfold-icon">+</span>
-      </button>
+      <button class="player-btn player-next" aria-label="Next">▶</button>
+
+      <div class="player-scrub">
+        <input type="range" class="player-progress" min="0" max="100" value="0" step="0.1" />
+      </div>
+
+      <span class="player-time text-xs">0:00</span>
+
+      <button class="player-fold-toggle" aria-label="Collapse player">−</button>
     </div>
+
+    <!-- Collapsed player bar - minimal -->
+    <div class="player-bar player-collapsed">
+      <button class="player-btn-mini player-play-mini" aria-label="Play">
+        <span class="play-icon">▶</span>
+        <span class="pause-icon">❙❙</span>
+      </button>
+      <div class="player-mini-progress">
+        <div class="player-mini-progress-fill"></div>
+      </div>
+      <button class="player-btn-mini player-unfold-toggle" aria-label="Expand player">+</button>
+    </div>
+
+    <!-- Title shown on hover/focus -->
+    <span class="player-title" aria-hidden="true">{firstMix.title}</span>
   </div>
 )}
 
@@ -61,18 +58,15 @@ const firstMix = mixes[0];
     background: var(--color-fg);
     color: var(--color-bg);
     border-radius: 2px;
-    width: calc(100% - var(--space-xl) * 2);
-    max-width: 900px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 
   .player-bar {
     display: flex;
     align-items: center;
-    gap: var(--space-lg);
-    padding: var(--space-md) var(--space-lg);
-    height: auto;
-    min-height: 56px;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    height: 44px;
   }
 
   /* Expanded state (default) */
@@ -90,31 +84,34 @@ const firstMix = mixes[0];
 
   .persistent-player.folded .player-collapsed {
     display: flex;
-    min-height: 44px;
+    height: 36px;
+    padding: 0 var(--space-md);
     gap: var(--space-sm);
-  }
-
-  .player-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    flex-shrink: 0;
   }
 
   .player-btn {
     background: transparent;
     border: 1px solid currentColor;
     color: inherit;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    padding: 0;
   }
 
   .player-btn:hover {
     background: var(--color-bg);
     color: var(--color-fg);
+  }
+
+  .player-play {
+    width: 40px;
   }
 
   .player-play .pause-icon,
@@ -132,30 +129,9 @@ const firstMix = mixes[0];
     display: inline;
   }
 
-  .player-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .player-title {
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-  }
-
-  .player-right {
+  .player-scrub {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    flex-shrink: 0;
-  }
-
-  .player-time {
-    opacity: 0.7;
-    min-width: 70px;
-    text-align: right;
   }
 
   .player-progress {
@@ -166,7 +142,7 @@ const firstMix = mixes[0];
     border: none;
     padding: 0;
     cursor: pointer;
-    width: 100px;
+    width: 120px;
   }
 
   .player-progress::-webkit-slider-thumb {
@@ -176,6 +152,13 @@ const firstMix = mixes[0];
     background: var(--color-bg);
     border-radius: 50%;
     cursor: pointer;
+  }
+
+  .player-time {
+    opacity: 0.7;
+    min-width: 80px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Fold/unfold toggle buttons */
@@ -192,6 +175,7 @@ const firstMix = mixes[0];
     font-size: var(--text-base);
     cursor: pointer;
     flex-shrink: 0;
+    padding: 0;
   }
 
   .player-fold-toggle:hover,
@@ -200,27 +184,69 @@ const firstMix = mixes[0];
     color: var(--color-fg);
   }
 
-  /* Collapsed mini player */
-  .player-play-mini {
-    padding: var(--space-xs);
-    min-width: 24px;
-    font-size: 10px;
-  }
-
-  .player-title-mini {
-    flex: 1;
+  /* Title - shown below player on hover */
+  .player-title {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: var(--space-xs);
     font-size: var(--text-xs);
     font-weight: 500;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: 0.8;
+    background: var(--color-fg);
+    color: var(--color-bg);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
   }
 
-  @media (max-width: 768px) {
-    .player-progress {
-      width: 60px;
-    }
+  .persistent-player:hover .player-title,
+  .persistent-player:focus-within .player-title {
+    opacity: 1;
+  }
+
+  .persistent-player.folded .player-title {
+    display: none;
+  }
+
+  /* Collapsed mini player */
+  .player-btn-mini {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+  }
+
+  .player-btn-mini:hover {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  .player-mini-progress {
+    width: 100px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .player-mini-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--color-bg);
+    transition: width 0.1s linear;
   }
 
   @media (max-width: 480px) {
@@ -230,11 +256,7 @@ const firstMix = mixes[0];
     }
 
     .player-progress {
-      display: none;
-    }
-
-    .player-time {
-      min-width: auto;
+      width: 80px;
     }
   }
 </style>
@@ -269,7 +291,6 @@ const firstMix = mixes[0];
     if (mixes.length === 0) return;
 
     const titleEl = playerEl.querySelector('.player-title')!;
-    const titleMiniEl = playerEl.querySelector('.player-title-mini')!;
     const timeEl = playerEl.querySelector('.player-time')!;
     const progressEl = playerEl.querySelector('.player-progress') as HTMLInputElement;
     const playBtn = playerEl.querySelector('.player-play')!;
@@ -284,7 +305,9 @@ const firstMix = mixes[0];
     function updateBodyPadding() {
       const isFolded = playerEl.classList.contains('folded');
       // Account for top offset (--space-md ~16px) + bar height + some breathing room
-      document.body.style.paddingTop = isFolded ? '76px' : '88px';
+      // Folded: 36px bar + 16px top + 8px buffer = 60px
+      // Expanded: 44px bar + 16px top + 8px buffer = 68px
+      document.body.style.paddingTop = isFolded ? '60px' : '68px';
     }
 
     function toggleFold() {
@@ -335,6 +358,12 @@ const firstMix = mixes[0];
 
       timeEl.textContent = `${current} / ${duration}`;
       progressEl.value = String(percent);
+
+      // Update mini progress bar
+      const miniProgressFill = playerEl.querySelector('.player-mini-progress-fill') as HTMLElement;
+      if (miniProgressFill) {
+        miniProgressFill.style.width = `${percent}%`;
+      }
     }
 
     function selectMix(index: number, autoPlay = false) {
@@ -344,7 +373,6 @@ const firstMix = mixes[0];
       currentIndex = index;
 
       titleEl.textContent = mix.title;
-      titleMiniEl.textContent = mix.title;
 
       if (audio.src !== mix.audio_url) {
         audio.src = mix.audio_url;
@@ -417,7 +445,6 @@ const firstMix = mixes[0];
       if (index >= 0) {
         currentIndex = index;
         titleEl.textContent = mixes[index].title;
-        titleMiniEl.textContent = mixes[index].title;
 
         if (savedState.isPlaying || savedState.currentTime > 0) {
           audio.src = mixes[index].audio_url;

@@ -1,63 +1,111 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { sendCampaign } from '../../../lib/resend';
+import { sendCampaign, removeFromResendAudience } from '../../../lib/resend';
 
 let subscribers: any[] = [];
 let activeCount = 0;
 let error = '';
 let success = '';
+let searchQuery = '';
+
+// Get search query from URL
+const url = new URL(Astro.request.url);
+searchQuery = url.searchParams.get('search') || '';
 
 if (supabaseAdmin) {
-  // Fetch subscribers
-  const { data: subsData, count } = await supabaseAdmin
+  // Fetch subscribers with optional search filter
+  let query = supabaseAdmin
     .from('newsletter_subscribers')
     .select('*', { count: 'exact' })
     .is('unsubscribed_at', null)
     .order('subscribed_at', { ascending: false });
 
+  if (searchQuery) {
+    query = query.ilike('email', `%${searchQuery}%`);
+  }
+
+  const { data: subsData, count } = await query;
+
   subscribers = subsData || [];
   activeCount = count || 0;
 }
 
-// Handle form submission - send email blast
+// Handle form submission
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
-  const subject = formData.get('subject') as string;
-  const content = formData.get('content') as string;
+  const action = formData.get('action') as string;
 
-  if (!subject || !content) {
-    error = 'Subject and content are required';
-  } else {
-    // Get active subscribers
-    const { data: activeSubs } = await supabaseAdmin
-      .from('newsletter_subscribers')
-      .select('email, unsubscribe_token')
-      .is('unsubscribed_at', null);
+  if (action === 'remove_subscriber') {
+    const subscriberId = formData.get('subscriber_id') as string;
+    const subscriberEmail = formData.get('subscriber_email') as string;
 
-    let sentCount = 0;
-    let failedCount = 0;
-
-    // Send to each subscriber
-    for (const sub of activeSubs || []) {
-      try {
-        await sendCampaign({
-          to: sub.email,
-          subject: subject,
-          htmlContent: content,
-          unsubscribeToken: sub.unsubscribe_token,
-        });
-        sentCount++;
-      } catch (err) {
-        console.error(`Failed to send to ${sub.email}:`, err);
-        failedCount++;
-      }
+    // First, try to remove from Resend audience
+    try {
+      await removeFromResendAudience(subscriberEmail);
+    } catch (resendErr) {
+      console.warn('Could not remove from Resend (may not exist):', resendErr);
+      // Continue with local removal even if Resend fails
     }
 
-    if (sentCount > 0) {
-      success = `Email sent to ${sentCount} subscriber${sentCount !== 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''}`;
+    // Then, soft delete in local database
+    const { error: removeError } = await supabaseAdmin
+      .from('newsletter_subscribers')
+      .update({ unsubscribed_at: new Date().toISOString() })
+      .eq('id', subscriberId);
+
+    if (removeError) {
+      error = `Failed to remove subscriber: ${removeError.message}`;
     } else {
-      error = 'Failed to send emails';
+      success = `Removed ${subscriberEmail} from mailing list`;
+      // Refresh subscriber list
+      const { data: subsData, count } = await supabaseAdmin
+        .from('newsletter_subscribers')
+        .select('*', { count: 'exact' })
+        .is('unsubscribed_at', null)
+        .order('subscribed_at', { ascending: false });
+      subscribers = subsData || [];
+      activeCount = count || 0;
+    }
+  }
+
+  if (action === 'send_email') {
+    const subject = formData.get('subject') as string;
+    const content = formData.get('content') as string;
+
+    if (!subject || !content) {
+      error = 'Subject and content are required';
+    } else {
+      // Get active subscribers
+      const { data: activeSubs } = await supabaseAdmin
+        .from('newsletter_subscribers')
+        .select('email, unsubscribe_token')
+        .is('unsubscribed_at', null);
+
+      let sentCount = 0;
+      let failedCount = 0;
+
+      // Send to each subscriber
+      for (const sub of activeSubs || []) {
+        try {
+          await sendCampaign({
+            to: sub.email,
+            subject: subject,
+            htmlContent: content,
+            unsubscribeToken: sub.unsubscribe_token,
+          });
+          sentCount++;
+        } catch (err) {
+          console.error(`Failed to send to ${sub.email}:`, err);
+          failedCount++;
+        }
+      }
+
+      if (sentCount > 0) {
+        success = `Email sent to ${sentCount} subscriber${sentCount !== 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''}`;
+      } else {
+        error = 'Failed to send emails';
+      }
     }
   }
 }
@@ -84,6 +132,7 @@ function formatDate(date: string) {
         </div>
 
         <form method="POST" class="compose-form">
+          <input type="hidden" name="action" value="send_email" />
           <div class="form-group">
             <label class="form-label">Subject</label>
             <input type="text" name="subject" required placeholder="Your email subject" />
@@ -112,21 +161,52 @@ You can use basic HTML tags like <p>, <a>, <strong>, etc."></textarea>
           <h2 class="admin-card-title">Subscribers</h2>
         </div>
 
+        <!-- Search form -->
+        <form method="GET" class="search-form mb-md">
+          <input
+            type="text"
+            name="search"
+            value={searchQuery}
+            placeholder="Search by email..."
+            class="search-input"
+          />
+          <button type="submit" class="btn-sm">Search</button>
+          {searchQuery && (
+            <a href="/admin/newsletter" class="btn-sm secondary">Clear</a>
+          )}
+        </form>
+
         {subscribers.length > 0 ? (
           <div class="subscribers-list">
-            {subscribers.slice(0, 20).map(sub => (
+            {subscribers.slice(0, 50).map(sub => (
               <div class="subscriber-item">
-                <span class="subscriber-email">{sub.email}</span>
-                <span class="subscriber-date text-muted">{formatDate(sub.subscribed_at)}</span>
+                <div class="subscriber-info">
+                  <span class="subscriber-email">{sub.email}</span>
+                  <span class="subscriber-date text-muted">{formatDate(sub.subscribed_at)}</span>
+                </div>
+                <form method="POST" class="remove-form">
+                  <input type="hidden" name="action" value="remove_subscriber" />
+                  <input type="hidden" name="subscriber_id" value={sub.id} />
+                  <input type="hidden" name="subscriber_email" value={sub.email} />
+                  <button
+                    type="submit"
+                    class="btn-sm btn-danger"
+                    onclick={`return confirm('Remove ${sub.email} from mailing list?')`}
+                  >
+                    Remove
+                  </button>
+                </form>
               </div>
             ))}
           </div>
+        ) : searchQuery ? (
+          <p class="text-muted text-sm">No subscribers found matching "{searchQuery}"</p>
         ) : (
           <p class="text-muted text-sm">No subscribers yet</p>
         )}
 
-        {subscribers.length > 20 && (
-          <p class="text-sm text-muted mt-md">+ {activeCount - 20} more</p>
+        {subscribers.length > 50 && (
+          <p class="text-sm text-muted mt-md">Showing 50 of {activeCount} subscribers. Use search to find specific emails.</p>
         )}
       </div>
     </div>
@@ -167,6 +247,17 @@ You can use basic HTML tags like <p>, <a>, <strong>, etc."></textarea>
     flex-direction: column;
   }
 
+  .search-form {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .search-input {
+    flex: 1;
+    max-width: 200px;
+  }
+
   .subscriber-item {
     display: flex;
     justify-content: space-between;
@@ -174,18 +265,43 @@ You can use basic HTML tags like <p>, <a>, <strong>, etc."></textarea>
     padding: var(--space-sm) 0;
     border-bottom: 1px solid var(--color-border);
     font-size: var(--text-sm);
+    gap: var(--space-sm);
   }
 
   .subscriber-item:last-child {
     border-bottom: none;
   }
 
+  .subscriber-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
   .subscriber-email {
     font-weight: 500;
+    word-break: break-word;
   }
 
   .subscriber-date {
     font-size: var(--text-xs);
+  }
+
+  .remove-form {
+    flex-shrink: 0;
+  }
+
+  .btn-danger {
+    background: #c5221f;
+    border-color: #c5221f;
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #a31c19;
+    border-color: #a31c19;
   }
 
   .error-message {

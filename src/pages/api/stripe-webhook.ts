@@ -107,6 +107,7 @@ export const POST: APIRoute = async ({ request }) => {
             customerName: session.customer_details.name,
             eventTitle: eventData.title,
             eventDate: new Date(eventData.date),
+            eventTimezone: eventData.timezone,
             venueName: eventData.venue_name,
             venueCity: eventData.venue_city,
             tierName: tierData.name,

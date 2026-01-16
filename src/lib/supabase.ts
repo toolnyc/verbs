@@ -29,6 +29,7 @@ export interface Event {
   description: string | null;
   date: string;
   time_end: string | null;
+  timezone: string;
   venue_name: string;
   venue_city: string;
   venue_link: string | null;
@@ -141,10 +142,17 @@ export async function getEventWithDetails(eventId: string) {
     .eq('event_id', eventId)
     .order('sort_order');
 
+  // Map event DJs to include slot times
+  const djsWithSlots = eventDjs?.map(ed => ({
+    ...ed.dj,
+    slot_start: ed.slot_start,
+    slot_end: ed.slot_end,
+  })).filter(Boolean) || [];
+
   return {
     event,
     tiers: tiers || [],
-    djs: eventDjs?.map(ed => ed.dj).filter(Boolean) || [],
+    djs: djsWithSlots,
   };
 }
 

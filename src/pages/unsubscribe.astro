@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { supabaseAdmin } from '../lib/supabase';
+import { removeFromResendAudience } from '../lib/resend';
 
 const token = Astro.url.searchParams.get('token');
 let status: 'invalid' | 'confirm' | 'done' = 'invalid';
@@ -20,11 +21,19 @@ if (token && supabaseAdmin) {
     if (subscriber.unsubscribed_at) {
       status = 'done';
     } else if (Astro.request.method === 'POST') {
-      // Process unsubscribe
+      // Process unsubscribe - update local database
       await supabaseAdmin
         .from('newsletter_subscribers')
         .update({ unsubscribed_at: new Date().toISOString() })
         .eq('id', subscriber.id);
+
+      // Sync with Resend - remove from audience
+      try {
+        await removeFromResendAudience(subscriber.email);
+      } catch (err) {
+        console.warn('Failed to remove from Resend audience:', err);
+        // Don't fail the unsubscribe if Resend sync fails
+      }
 
       status = 'done';
     } else {

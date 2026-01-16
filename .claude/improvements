@@ -1,0 +1,46 @@
+# Improvements - All Completed
+
+## Round 1 - Completed
+
+### Player design
+- Reordered layout to prioritize controls
+- Title appears on hover as tooltip
+- Width fits content
+
+### Footer / logo
+- Inlined SVG with explicit white colors (`fill="#fff"`, `stroke="#fff"`)
+- Outer ring stays static, inner content spins
+
+### Loading states
+- Added 600ms minimum display time
+- Persists state across ViewTransitions
+- Visual: dark background pill with white spinning logo
+
+### GSAP hover animations
+- Wrapped in reusable function with cleanup
+- Re-initializes on `astro:page-load`
+
+---
+
+## Round 2 - Completed
+
+### 1. Minimized player too small
+**Fixed:** Increased collapsed player height from 28px to 36px, mini buttons from 20px to 28px with borders, progress bar from 80px to 100px
+
+### 2. Loading state not visible
+**Fixed:**
+- Increased minimum display time to 600ms
+- Added dark background pill with padding
+- Added shadow for visibility
+- Used `filter: invert(1)` to make logo white on dark background
+- Fixed state persistence across ViewTransitions using window globals
+
+### 3. Non-spin logo part not visible
+**Fixed:** Added explicit white colors as SVG attributes (`fill="#fff"`, `stroke="#fff"`) instead of relying on CSS inheritance which doesn't work well with SVG
+
+### 4. Next party countdown broken
+**Fixed:**
+- Added proper ViewTransitions handling with `astro:page-load` listener
+- Clears and re-creates interval on page navigation
+- Added NaN check for invalid dates
+- Used window global to prevent multiple intervals

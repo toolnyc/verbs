@@ -84,49 +84,74 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
   import gsap from 'gsap';
   import { createHoverPreview } from '../../lib/animations';
 
-  // Initialize hover previews and animated backgrounds for verb items
-  const verbItems = document.querySelectorAll('.verb-item');
+  // Store cleanup functions for re-initialization
+  const cleanupFunctions: (() => void)[] = [];
 
-  verbItems.forEach(item => {
-    const preview = item.querySelector('.flyer-preview') as HTMLElement;
-    if (preview) {
-      createHoverPreview(item as HTMLElement, preview);
-    }
+  function initVerbGridAnimations() {
+    // Clean up previous animations
+    cleanupFunctions.forEach(cleanup => cleanup());
+    cleanupFunctions.length = 0;
 
-    // Only add hover animation to clickable items
-    if (!item.classList.contains('clickable')) return;
+    // Initialize hover previews and animated backgrounds for verb items
+    const verbItems = document.querySelectorAll('.verb-item');
 
-    const hoverBg = item.querySelector('.hover-bg') as HTMLElement;
-    const title = item.querySelector('.verb-title') as HTMLElement;
-    if (!hoverBg || !title) return;
+    verbItems.forEach(item => {
+      const preview = item.querySelector('.flyer-preview') as HTMLElement;
+      if (preview) {
+        const cleanup = createHoverPreview(item as HTMLElement, preview);
+        cleanupFunctions.push(cleanup);
+      }
 
-    // GSAP hover animation
-    const tl = gsap.timeline({ paused: true });
+      // Only add hover animation to clickable items
+      if (!item.classList.contains('clickable')) return;
 
-    // Animate background sliding up with a slight skew for diagonal effect
-    tl.to(hoverBg, {
-      y: 0,
-      skewY: -2,
-      duration: 0.4,
-      ease: 'power3.out',
-    })
-    .to(hoverBg, {
-      skewY: 0,
-      duration: 0.2,
-      ease: 'power2.out',
-    }, '-=0.1')
-    .to(title, {
-      color: 'var(--color-bg)',
-      duration: 0.3,
-      ease: 'power2.out',
-    }, 0.1);
+      const hoverBg = item.querySelector('.hover-bg') as HTMLElement;
+      const title = item.querySelector('.verb-title') as HTMLElement;
+      if (!hoverBg || !title) return;
 
-    item.addEventListener('mouseenter', () => {
-      tl.play();
+      // Reset any existing transforms
+      gsap.set(hoverBg, { y: '100%', skewY: 0 });
+      gsap.set(title, { clearProps: 'color' });
+
+      // GSAP hover animation
+      const tl = gsap.timeline({ paused: true });
+
+      // Animate background sliding up with a slight skew for diagonal effect
+      tl.to(hoverBg, {
+        y: 0,
+        skewY: -2,
+        duration: 0.4,
+        ease: 'power3.out',
+      })
+      .to(hoverBg, {
+        skewY: 0,
+        duration: 0.2,
+        ease: 'power2.out',
+      }, '-=0.1')
+      .to(title, {
+        color: 'var(--color-bg)',
+        duration: 0.3,
+        ease: 'power2.out',
+      }, 0.1);
+
+      const onEnter = () => tl.play();
+      const onLeave = () => tl.reverse();
+
+      item.addEventListener('mouseenter', onEnter);
+      item.addEventListener('mouseleave', onLeave);
+
+      // Store cleanup function
+      cleanupFunctions.push(() => {
+        tl.kill();
+        item.removeEventListener('mouseenter', onEnter);
+        item.removeEventListener('mouseleave', onLeave);
+      });
     });
+  }
 
-    item.addEventListener('mouseleave', () => {
-      tl.reverse();
-    });
-  });
+  // Initialize on first load
+  initVerbGridAnimations();
+
+  // Re-initialize after Astro view transitions
+  document.addEventListener('astro:page-load', initVerbGridAnimations);
 </script>

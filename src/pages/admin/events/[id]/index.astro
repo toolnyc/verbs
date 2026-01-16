@@ -62,6 +62,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         description: formData.get('description') || null,
         date: formData.get('date'),
         time_end: formData.get('time_end') || null,
+        timezone: formData.get('timezone') || 'America/New_York',
         venue_name: formData.get('venue_name'),
         venue_city: formData.get('venue_city'),
         venue_link: formData.get('venue_link') || null,
@@ -144,6 +145,8 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
   if (action === 'add_dj') {
     const djId = formData.get('dj_id');
     const newDjName = formData.get('new_dj_name');
+    const slotStart = formData.get('slot_start') as string || null;
+    const slotEnd = formData.get('slot_end') as string || null;
 
     let targetDjId = djId;
 
@@ -164,6 +167,8 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
       await supabaseAdmin.from('event_djs').insert({
         event_id: id,
         dj_id: targetDjId,
+        slot_start: slotStart || null,
+        slot_end: slotEnd || null,
         sort_order: eventDjs.length,
       });
 
@@ -175,6 +180,25 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
       const { data: refreshedAllDjs } = await supabaseAdmin.from('djs').select('*').order('name');
       allDjs = refreshedAllDjs || [];
     }
+  }
+
+  if (action === 'update_dj_times') {
+    const eventDjId = formData.get('event_dj_id');
+    const slotStart = formData.get('slot_start') as string || null;
+    const slotEnd = formData.get('slot_end') as string || null;
+
+    await supabaseAdmin
+      .from('event_djs')
+      .update({
+        slot_start: slotStart || null,
+        slot_end: slotEnd || null,
+      })
+      .eq('id', eventDjId);
+
+    // Refresh
+    const { data: refreshedDjs } = await supabaseAdmin
+      .from('event_djs').select('*, dj:djs(*)').eq('event_id', id).order('sort_order');
+    eventDjs = refreshedDjs || [];
   }
 
   if (action === 'remove_dj') {
@@ -228,6 +252,26 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
             <label for="time_end" class="form-label">End Time</label>
             <input type="datetime-local" id="time_end" name="time_end" value={event.time_end ? formatDateForInput(event.time_end) : ''} />
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="timezone" class="form-label">Timezone</label>
+          <select id="timezone" name="timezone">
+            <option value="America/New_York" selected={event.timezone === 'America/New_York'}>Eastern (America/New_York)</option>
+            <option value="America/Chicago" selected={event.timezone === 'America/Chicago'}>Central (America/Chicago)</option>
+            <option value="America/Denver" selected={event.timezone === 'America/Denver'}>Mountain (America/Denver)</option>
+            <option value="America/Los_Angeles" selected={event.timezone === 'America/Los_Angeles'}>Pacific (America/Los_Angeles)</option>
+            <option value="America/Phoenix" selected={event.timezone === 'America/Phoenix'}>Arizona (America/Phoenix)</option>
+            <option value="America/Anchorage" selected={event.timezone === 'America/Anchorage'}>Alaska (America/Anchorage)</option>
+            <option value="Pacific/Honolulu" selected={event.timezone === 'Pacific/Honolulu'}>Hawaii (Pacific/Honolulu)</option>
+            <option value="Europe/London" selected={event.timezone === 'Europe/London'}>UK (Europe/London)</option>
+            <option value="Europe/Paris" selected={event.timezone === 'Europe/Paris'}>Central Europe (Europe/Paris)</option>
+            <option value="Europe/Berlin" selected={event.timezone === 'Europe/Berlin'}>Germany (Europe/Berlin)</option>
+            <option value="Europe/Amsterdam" selected={event.timezone === 'Europe/Amsterdam'}>Netherlands (Europe/Amsterdam)</option>
+            <option value="Asia/Tokyo" selected={event.timezone === 'Asia/Tokyo'}>Japan (Asia/Tokyo)</option>
+            <option value="Asia/Shanghai" selected={event.timezone === 'Asia/Shanghai'}>China (Asia/Shanghai)</option>
+            <option value="Australia/Sydney" selected={event.timezone === 'Australia/Sydney'}>Sydney (Australia/Sydney)</option>
+          </select>
         </div>
 
         <div class="form-row">
@@ -330,7 +374,31 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           <div class="djs-list">
             {eventDjs.map(ed => (
               <div class="dj-item">
-                <span class="dj-name">{ed.dj?.name}</span>
+                <div class="dj-info">
+                  <span class="dj-name">{ed.dj?.name}</span>
+                  <form method="POST" class="dj-times-form">
+                    <input type="hidden" name="action" value="update_dj_times" />
+                    <input type="hidden" name="event_dj_id" value={ed.id} />
+                    <div class="time-inputs">
+                      <input
+                        type="time"
+                        name="slot_start"
+                        value={ed.slot_start || ''}
+                        placeholder="Start"
+                        class="time-input"
+                      />
+                      <span class="time-separator">—</span>
+                      <input
+                        type="time"
+                        name="slot_end"
+                        value={ed.slot_end || ''}
+                        placeholder="End"
+                        class="time-input"
+                      />
+                      <button type="submit" class="btn-sm">Save</button>
+                    </div>
+                  </form>
+                </div>
                 <form method="POST" class="inline-form">
                   <input type="hidden" name="action" value="remove_dj" />
                   <input type="hidden" name="event_dj_id" value={ed.id} />
@@ -353,6 +421,11 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
             </select>
           )}
           <input type="text" name="new_dj_name" placeholder="Or create new DJ..." class="mb-sm" />
+          <div class="time-inputs mb-sm">
+            <input type="time" name="slot_start" placeholder="Start time" class="time-input" />
+            <span class="time-separator">—</span>
+            <input type="time" name="slot_end" placeholder="End time" class="time-input" />
+          </div>
           <button type="submit" class="btn-sm">Add to Lineup</button>
         </form>
       </div>
@@ -455,13 +528,43 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   .dj-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     padding: var(--space-sm);
     background: var(--color-bg-alt);
+    gap: var(--space-sm);
+  }
+
+  .dj-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
   }
 
   .dj-name {
     font-weight: 500;
+  }
+
+  .dj-times-form {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .time-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .time-input {
+    width: 100px;
+    padding: var(--space-xs);
+    font-size: var(--text-sm);
+  }
+
+  .time-separator {
+    color: var(--color-muted);
   }
 
   .inline-form {

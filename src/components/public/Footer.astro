@@ -18,7 +18,21 @@ const { nextEventDate } = Astro.props;
         <span class="newsletter-status"></span>
       </form>
 
-      <a href="/" class="footer-home">VERBS</a>
+      <a href="/" class="footer-home no-underline" aria-label="VERBS Home">
+        <svg class="footer-logo" viewBox="0 0 297.67 297.67" aria-hidden="true">
+          <!-- Outer circle - static -->
+          <circle class="logo-ring" cx="148.83" cy="148.83" r="147.83" fill="none" stroke="#fff" stroke-width="2"/>
+          <!-- Inner content - spins -->
+          <g class="logo-spin" fill="#fff">
+            <path d="M60.98,30.96c-.08-1.37.97-2.54,2.34-2.62l87.7-4.93c37.09-2.08,69.54,13.17,71.62,50.25,1.17,20.83-8.67,36.16-27.24,45.87l.04.76c15.05,4.76,23.24,14.49,27.08,28.55,6.05,21.57,3.46,47.97,10.16,49.37l.16,2.79-52.33,2.94c-5.28-3.27-4.5-25.74-9.23-41.78-4.09-13.78-10.58-20.55-26.08-19.68l-24.64,1.38,3.55,63.25-53.09,2.98L60.98,30.96ZM118.45,106.02l28.45-1.6c15.24-.86,23.25-7.93,22.54-20.63-.67-11.94-8.72-19.13-23.96-18.27l-29.21,1.64,2.18,38.86Z"/>
+            <path d="M296.22,137.32c-2.45-43.64-24.84-81.49-56.9-106.8l9.42,167.6,39.84-2.47c6.65-18.16,8.79-37.85,7.64-58.33Z"/>
+            <path d="M15.12,214.06l42.76-2.67-2.83-45.3-53.51,3.35c2.19,15.94,6.79,30.8,13.58,44.62Z"/>
+            <path d="M19.98,75.31l26.75-1.67-1.93-30.86c-9.87,9.54-17.91,20.62-24.82,32.53Z"/>
+            <path d="M33.83,99.09l-25.51,1.55c-4.47,12.69-7.2,26.51-7.97,40.43l35.96-2.25-2.48-39.73Z"/>
+            <path d="M23.09,226.62c14.1,22.75,34.17,41.29,57.89,53.57h135.74c23.86-12.35,43.81-30.97,57.82-53.57H23.09Z"/>
+          </g>
+        </svg>
+      </a>
 
       <div class="footer-right">
         <div class="footer-countdown">
@@ -69,12 +83,21 @@ const { nextEventDate } = Astro.props;
 </div>
 
 <script>
+  // Use window to persist interval across ViewTransitions
+  declare global {
+    interface Window {
+      _countdownInterval?: number;
+    }
+  }
+
   function updateCountdown() {
     const footer = document.querySelector('.site-footer') as HTMLElement;
     const nextEventDate = footer?.dataset.nextEvent;
 
+    const elements = document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay');
+
     if (!nextEventDate) {
-      document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+      elements.forEach(el => {
         if (el) el.textContent = 'TBA';
       });
       return;
@@ -84,8 +107,15 @@ const { nextEventDate } = Astro.props;
     const eventDate = new Date(nextEventDate);
     const diff = eventDate.getTime() - now.getTime();
 
+    if (isNaN(diff)) {
+      elements.forEach(el => {
+        if (el) el.textContent = 'TBA';
+      });
+      return;
+    }
+
     if (diff <= 0) {
-      document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+      elements.forEach(el => {
         if (el) el.textContent = 'Now!';
       });
       return;
@@ -105,14 +135,27 @@ const { nextEventDate } = Astro.props;
       countdownText = `${minutes}m ${seconds}s`;
     }
 
-    document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay').forEach(el => {
+    elements.forEach(el => {
       if (el) el.textContent = countdownText;
     });
   }
 
-  // Update immediately and then every second
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
+  function initCountdown() {
+    // Clear any existing interval
+    if (window._countdownInterval) {
+      clearInterval(window._countdownInterval);
+    }
+
+    // Update immediately and then every second
+    updateCountdown();
+    window._countdownInterval = window.setInterval(updateCountdown, 1000);
+  }
+
+  // Initialize countdown
+  initCountdown();
+
+  // Re-initialize after ViewTransitions
+  document.addEventListener('astro:page-load', initCountdown);
 
   // Desktop footer expand/collapse
   const footerDesktop = document.getElementById('footer-desktop');
@@ -257,9 +300,28 @@ const { nextEventDate } = Astro.props;
   }
 
   .footer-home {
-    font-weight: 700;
-    font-size: var(--text-base);
-    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .footer-logo {
+    height: 36px;
+    width: 36px;
+  }
+
+  .footer-logo .logo-spin {
+    transform-origin: center;
+    animation: spin 12s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .footer-right {

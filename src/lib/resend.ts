@@ -2,14 +2,66 @@ import { Resend } from 'resend';
 
 const resendApiKey = import.meta.env.RESEND_API_KEY;
 const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world/';
+const resendAudienceId = import.meta.env.RESEND_AUDIENCE_ID;
 
 export const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+// Add a contact to Resend audience
+export async function addToResendAudience(email: string) {
+  if (!resend || !resendAudienceId) {
+    console.warn('Resend or audience ID not configured, skipping');
+    return;
+  }
+
+  try {
+    await resend.contacts.create({
+      audienceId: resendAudienceId,
+      email,
+      unsubscribed: false,
+    });
+  } catch (err: any) {
+    // If contact already exists, that's fine
+    if (!err.message?.includes('already exists')) {
+      throw err;
+    }
+  }
+}
+
+// Remove a contact from Resend audience
+export async function removeFromResendAudience(email: string) {
+  if (!resend || !resendAudienceId) {
+    console.warn('Resend or audience ID not configured, skipping');
+    return;
+  }
+
+  // Resend's SDK requires contact ID to delete, so we first get the contact
+  // Alternatively, we can update the contact to unsubscribed status
+  try {
+    // Get all contacts and find the one with matching email
+    const { data: contacts } = await resend.contacts.list({
+      audienceId: resendAudienceId,
+    });
+
+    const contact = contacts?.data?.find((c: any) => c.email === email);
+
+    if (contact) {
+      await resend.contacts.remove({
+        audienceId: resendAudienceId,
+        id: contact.id,
+      });
+    }
+  } catch (err) {
+    console.error('Error removing contact from Resend:', err);
+    throw err;
+  }
+}
 
 export async function sendTicketConfirmation({
   to,
   customerName,
   eventTitle,
   eventDate,
+  eventTimezone,
   venueName,
   venueCity,
   tierName,
@@ -20,6 +72,7 @@ export async function sendTicketConfirmation({
   customerName: string | null;
   eventTitle: string;
   eventDate: Date;
+  eventTimezone?: string;
   venueName: string;
   venueCity: string;
   tierName: string;
@@ -38,10 +91,19 @@ export async function sendTicketConfirmation({
     day: 'numeric',
   });
 
-  const formattedTime = eventDate.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+  const timezone = eventTimezone || 'America/New_York';
+  const formattedTime = eventDate.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
+    timeZone: timezone,
   });
+
+  // Get timezone abbreviation for display
+  const timezoneAbbr = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    timeZoneName: 'short',
+  }).formatToParts(eventDate).find(p => p.type === 'timeZoneName')?.value || timezone;
 
   const html = `
     <!DOCTYPE html>
@@ -74,7 +136,7 @@ export async function sendTicketConfirmation({
         </div>
         <div class="detail-row">
           <span class="label">Time</span>
-          <span>${formattedTime}</span>
+          <span>${formattedTime} ${timezoneAbbr}</span>
         </div>
         <div class="detail-row">
           <span class="label">Venue</span>

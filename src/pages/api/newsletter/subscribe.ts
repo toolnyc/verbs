@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { addToResendAudience } from '../../../lib/resend';
 
 // Simple in-memory rate limiting (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -75,6 +76,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           })
           .eq('id', existing.id);
 
+        // Sync with Resend audience
+        try {
+          await addToResendAudience(email.toLowerCase());
+        } catch (err) {
+          console.warn('Failed to add to Resend audience:', err);
+          // Don't fail the subscription if Resend sync fails
+        }
+
         return new Response(
           JSON.stringify({ message: 'Welcome back! You\'ve been resubscribed.' }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -101,6 +110,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         JSON.stringify({ error: 'Failed to subscribe. Please try again.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Sync with Resend audience
+    try {
+      await addToResendAudience(email.toLowerCase());
+    } catch (err) {
+      console.warn('Failed to add to Resend audience:', err);
+      // Don't fail the subscription if Resend sync fails
     }
 
     return new Response(
