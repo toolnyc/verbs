@@ -81,52 +81,155 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
   .buy-btn {
     padding: var(--space-sm) var(--space-lg);
     white-space: nowrap;
-    background: var(--color-green);
-    border-color: var(--color-green);
+    background: var(--color-bg);
+    border-color: var(--color--border);
     color: var(--color-fg);
   }
 
   .buy-btn:hover {
-    background: transparent;
-    color: var(--color-green);
+    background: var(--color-green);
+    color: var(--color-fg);
   }
 </style>
 
 <script>
-  // Ticket purchase handler
-  document.querySelectorAll('.buy-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const button = e.target as HTMLButtonElement;
-      const eventId = button.dataset.eventId;
-      const tierId = button.dataset.tierId;
+  // Store pending checkout details
+  let pendingCheckout: { eventId: string; tierId: string } | null = null;
 
-      button.disabled = true;
-      button.textContent = 'Loading...';
+  function getModal() {
+    return document.getElementById('house-rules-modal');
+  }
 
-      try {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event_id: eventId,
-            ticket_tier_id: tierId,
-            quantity: 1,
-          }),
-        });
+  function getCheckbox() {
+    return document.getElementById('rules-agreement') as HTMLInputElement | null;
+  }
 
-        const data = await response.json();
+  function getProceedBtn() {
+    return document.getElementById('proceed-checkout') as HTMLButtonElement | null;
+  }
 
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error(data.error || 'Checkout failed');
-        }
-      } catch (err) {
-        console.error('Checkout error:', err);
-        button.disabled = false;
-        button.textContent = `Buy $${button.dataset.price}`;
-        alert('Something went wrong. Please try again.');
+  function openModal(eventId: string, tierId: string) {
+    const modal = getModal();
+    const checkbox = getCheckbox();
+    const proceedBtn = getProceedBtn();
+
+    if (!modal || !checkbox || !proceedBtn) return;
+
+    pendingCheckout = { eventId, tierId };
+    checkbox.checked = false;
+    proceedBtn.disabled = true;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    const modal = getModal();
+    const checkbox = getCheckbox();
+
+    if (!modal) return;
+
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    pendingCheckout = null;
+    if (checkbox) checkbox.checked = false;
+  }
+
+  async function proceedToCheckout() {
+    if (!pendingCheckout) return;
+
+    const proceedBtn = getProceedBtn();
+    if (!proceedBtn) return;
+
+    const originalText = proceedBtn.textContent;
+    proceedBtn.disabled = true;
+    proceedBtn.textContent = 'Loading...';
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: pendingCheckout.eventId,
+          ticket_tier_id: pendingCheckout.tierId,
+          quantity: 1,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'Checkout failed');
       }
-    });
-  });
+    } catch (err) {
+      console.error('Checkout error:', err);
+      proceedBtn.disabled = false;
+      proceedBtn.textContent = originalText;
+      alert('Something went wrong. Please try again.');
+    }
+  }
+
+  function handleBuyClick(e: Event) {
+    const target = e.target as HTMLElement;
+    const button = target.closest('.buy-btn') as HTMLButtonElement;
+    if (!button) return;
+
+    const eventId = button.dataset.eventId;
+    const tierId = button.dataset.tierId;
+
+    if (eventId && tierId) {
+      openModal(eventId, tierId);
+    }
+  }
+
+  function handleModalClick(e: Event) {
+    const target = e.target as HTMLElement;
+
+    // Close on backdrop click
+    if (target.classList.contains('modal-backdrop')) {
+      closeModal();
+      return;
+    }
+
+    // Close on cancel button
+    if (target.hasAttribute('data-close-modal')) {
+      closeModal();
+      return;
+    }
+
+    // Proceed to checkout
+    if (target.id === 'proceed-checkout' && !target.hasAttribute('disabled')) {
+      proceedToCheckout();
+      return;
+    }
+  }
+
+  function handleCheckboxChange(e: Event) {
+    const checkbox = e.target as HTMLInputElement;
+    if (checkbox.id !== 'rules-agreement') return;
+
+    const proceedBtn = getProceedBtn();
+    if (proceedBtn) {
+      proceedBtn.disabled = !checkbox.checked;
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      const modal = getModal();
+      if (modal?.getAttribute('aria-hidden') === 'false') {
+        closeModal();
+      }
+    }
+  }
+
+  // Only add listeners once using a flag on document
+  if (!(document as any).__ticketBuyListenerAdded) {
+    document.addEventListener('click', handleBuyClick);
+    document.addEventListener('click', handleModalClick);
+    document.addEventListener('change', handleCheckboxChange);
+    document.addEventListener('keydown', handleKeydown);
+    (document as any).__ticketBuyListenerAdded = true;
+  }
 </script>

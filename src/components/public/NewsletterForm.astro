@@ -110,12 +110,18 @@
 </style>
 
 <script>
-  const form = document.getElementById('newsletterForm') as HTMLFormElement;
-  const message = document.getElementById('formMessage')!;
-  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+  // Use event delegation for newsletter form - survives ViewTransitions
+  async function handleNewsletterSubmit(e: Event) {
+    const target = e.target as HTMLElement;
+    const form = target.closest('#newsletterForm') as HTMLFormElement;
+    if (!form) return;
 
-  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const message = form.querySelector('.form-message') as HTMLElement;
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    if (!message || !submitBtn) return;
 
     const formData = new FormData(form);
     const email = formData.get('email') as string;
@@ -148,5 +154,11 @@
       submitBtn.disabled = false;
       submitBtn.textContent = 'Subscribe';
     }
-  });
+  }
+
+  // Only add listener once using a flag on document
+  if (!(document as any).__newsletterFormListenerAdded) {
+    document.addEventListener('submit', handleNewsletterSubmit);
+    (document as any).__newsletterFormListenerAdded = true;
+  }
 </script>

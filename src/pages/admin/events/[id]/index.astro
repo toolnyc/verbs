@@ -145,6 +145,43 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     tiers = refreshedTiers || [];
   }
 
+  if (action === 'sync_tier_stripe') {
+    const tierId = formData.get('tier_id');
+
+    // Fetch the tier
+    const { data: tier } = await supabaseAdmin
+      .from('ticket_tiers')
+      .select('*')
+      .eq('id', tierId)
+      .single();
+
+    if (tier && tier.tier_type === 'online' && !tier.stripe_price_id) {
+      try {
+        const { productId, priceId } = await createProductAndPrice({
+          eventTitle: event.title,
+          tierName: tier.name,
+          price: tier.price,
+        });
+
+        await supabaseAdmin
+          .from('ticket_tiers')
+          .update({
+            stripe_product_id: productId,
+            stripe_price_id: priceId,
+          })
+          .eq('id', tierId);
+
+        success = 'Stripe product created successfully';
+      } catch (stripeErr: any) {
+        error = `Stripe error: ${stripeErr.message}`;
+      }
+    }
+
+    const { data: refreshedTiers } = await supabaseAdmin
+      .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+    tiers = refreshedTiers || [];
+  }
+
   if (action === 'add_dj') {
     const djId = formData.get('dj_id');
     const newDjName = formData.get('new_dj_name');
@@ -345,6 +382,13 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
                   <span class="text-sm">{tier.sold_count} / {tier.max_stock || '∞'}</span>
                 </div>
                 <div class="tier-actions">
+                  {tier.tier_type === 'online' && !tier.stripe_price_id && (
+                    <form method="POST" class="inline-form">
+                      <input type="hidden" name="action" value="sync_tier_stripe" />
+                      <input type="hidden" name="tier_id" value={tier.id} />
+                      <button type="submit" class="btn-sm btn-warning">Sync Stripe</button>
+                    </form>
+                  )}
                   <form method="POST" class="inline-form">
                     <input type="hidden" name="action" value="toggle_tier" />
                     <input type="hidden" name="tier_id" value={tier.id} />

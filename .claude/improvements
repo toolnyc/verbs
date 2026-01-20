@@ -1,46 +1,35 @@
-# Improvements - All Completed
+Feature Improvements
+1. Need to include house rules agreement (see copy below) in order to begin a checkout session
+2. Need to create a checkout success page
+  2a. Need to investigate why stock is not decrementing and orders are not being logged in the
+  database
 
-## Round 1 - Completed
 
-### Player design
-- Reordered layout to prioritize controls
-- Title appears on hover as tooltip
-- Width fits content
 
-### Footer / logo
-- Inlined SVG with explicit white colors (`fill="#fff"`, `stroke="#fff"`)
-- Outer ring stays static, inner content spins
 
-### Loading states
-- Added 600ms minimum display time
-- Persists state across ViewTransitions
-- Visual: dark background pill with white spinning logo
-
-### GSAP hover animations
-- Wrapped in reusable function with cleanup
-- Re-initializes on `astro:page-load`
-
----
-
-## Round 2 - Completed
-
-### 1. Minimized player too small
-**Fixed:** Increased collapsed player height from 28px to 36px, mini buttons from 20px to 28px with borders, progress bar from 80px to 100px
-
-### 2. Loading state not visible
-**Fixed:**
-- Increased minimum display time to 600ms
-- Added dark background pill with padding
-- Added shadow for visibility
-- Used `filter: invert(1)` to make logo white on dark background
-- Fixed state persistence across ViewTransitions using window globals
-
-### 3. Non-spin logo part not visible
-**Fixed:** Added explicit white colors as SVG attributes (`fill="#fff"`, `stroke="#fff"`) instead of relying on CSS inheritance which doesn't work well with SVG
-
-### 4. Next party countdown broken
-**Fixed:**
-- Added proper ViewTransitions handling with `astro:page-load` listener
-- Clears and re-creates interval on page navigation
-- Added NaN check for invalid dates
-- Used window global to prevent multiple intervals
+photography
+-
+be present - please keep phone use off the dance floor. a sticker will be placed on your phone cameras upon entry.
+-
+no professional cameras
+-
+please respect this policy as you'll be respecting the space and people around you
+-
+this policy is required for entry
+disclaimers
+-
+MINIMUM AGE FOR ENTRY IS 21
+-
+OUTSIDE FOOD AND OR ALCOHOL IS PROHIBITED UPON ENTRY
+-
+VERBS IS NOT RESPONSIBLE FOR LOST OR STOLEN GOODS
+-
+VERBS DOES NOT BEAR RESPONSIBILITY FOR ANY INJURY OR MEDICAL ISSUES SUFFERED ONSITE. HOWEVER, IF NECESSARY, WE ARE OBLIGED TO CALL FIRST RESPONDERS. PLEASE NOTE THAT ANY EXPENSES INCURRED FOR MEDICAL ASSISTANCE WILL BE THE RESPONSIBILITY OF THE INDIVIDUAL IN NEED OF CARE.
+-
+IF YOU LOST SOMETHING PLEASE EMAIL INFO@VERBS-MIA.COM, WE’LL COME BACK TO YOU AFTER THE EVENT TAKES PLACE AND IF IT HAS BEEN FOUND
+-
+OPEN USE OF, POSSESSION OR TRADE OF ILLEGAL SUBSTANCES IS PROHIBITED AND WILL RESULT IN IMMEDIATE REMOVAL FROM THE PREMISE
+-
+POSSESSION OR TRADE OF WEAPONS IS PROHIBITED. YOU WILL BE SEARCHED AT THE DOOR. IF YOU DO NOT AGREE TO THIS, YOU WILL BE DENYED ENTRY
+-
+SAFETY, WELL-BEING, AND INCLUSIVITY IS A PRIORITY. WE HAVE A ZERO- TOLERANCE POLICY TOWARDS AGGRESSION, DISCRIMINATION, HARASSMENT, OR ANY FORM OF VIOLENCE. THIS MEANS NO RACISM, QUEER-PHOBIA, BULLYING, SEXUAL MISCONDUCT, ANTI-SEMITISM, ETC. WE ENCOURAGE YOU TO REPOST ANY CONCERNS TO OUR SECURITY OR MEMBERS BEHIND THE BAR

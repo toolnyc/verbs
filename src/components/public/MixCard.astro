@@ -154,16 +154,23 @@ const formatDuration = (seconds: number | null) => {
 </style>
 
 <script>
-  // Dispatch playMix event to global player
-  document.querySelectorAll('.mix-card').forEach(card => {
-    const playBtn = card.querySelector('.play-btn');
-    const mixId = (card as HTMLElement).dataset.mixId;
+  // Use event delegation to handle play clicks - survives ViewTransitions
+  function handleMixCardClick(e: Event) {
+    const target = e.target as HTMLElement;
+    const playBtn = target.closest('.play-btn');
+    if (!playBtn) return;
 
-    playBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('playMix', {
-        detail: { mixId }
-      }));
-    });
-  });
+    const card = playBtn.closest('.mix-card') as HTMLElement;
+    if (!card) return;
+
+    e.preventDefault();
+    const mixId = card.dataset.mixId;
+    window.dispatchEvent(new CustomEvent('playMix', { detail: { mixId } }));
+  }
+
+  // Only add listener once using a flag on document
+  if (!(document as any).__mixCardListenerAdded) {
+    document.addEventListener('click', handleMixCardClick);
+    (document as any).__mixCardListenerAdded = true;
+  }
 </script>

@@ -244,8 +244,8 @@ button.accent-green {
 }
 
 button.accent-green:hover {
-  background: transparent;
-  color: var(--color-green);
+  background: var(--color-green);
+  color: var(--color-fg);
 }
 
 /* Utility classes */

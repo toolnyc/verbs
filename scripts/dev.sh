@@ -3,7 +3,11 @@
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Log file for Stripe webhook events
+STRIPE_LOG=".stripe-webhooks.log"
 
 # Check if stripe CLI is installed
 if ! command -v stripe &> /dev/null; then
@@ -19,43 +23,38 @@ if ! stripe config --list &> /dev/null; then
     exit 1
 fi
 
-# Create a temp file for the webhook secret
-TEMP_FILE=$(mktemp)
+# Clear previous log and create fresh
+> "$STRIPE_LOG"
 
-# Start stripe listen in background and capture output
+# Start stripe listen in background, log to file
 echo "Starting Stripe webhook listener..."
-stripe listen --forward-to localhost:4321/api/stripe-webhook 2>&1 | tee "$TEMP_FILE" &
+stripe listen --forward-to localhost:4321/api/stripe-webhook >> "$STRIPE_LOG" 2>&1 &
 STRIPE_PID=$!
 
-# Wait for the webhook secret to appear in output
+# Wait for the webhook secret to appear in log
 echo "Waiting for webhook secret..."
 for i in {1..30}; do
-    if grep -q "whsec_" "$TEMP_FILE"; then
+    if grep -q "whsec_" "$STRIPE_LOG"; then
         break
     fi
     sleep 0.5
 done
 
 # Extract the webhook secret
-WEBHOOK_SECRET=$(grep -o 'whsec_[a-zA-Z0-9]*' "$TEMP_FILE" | head -1)
+WEBHOOK_SECRET=$(grep -o 'whsec_[a-zA-Z0-9]*' "$STRIPE_LOG" | head -1)
 
 if [ -z "$WEBHOOK_SECRET" ]; then
     echo -e "${YELLOW}Could not capture webhook secret. Check stripe login status.${NC}"
     kill $STRIPE_PID 2>/dev/null
-    rm "$TEMP_FILE"
     exit 1
 fi
 
 echo ""
-echo -e "${GREEN}Stripe webhook secret:${NC}"
-echo "  STRIPE_WEBHOOK_SECRET=$WEBHOOK_SECRET"
+echo -e "${GREEN}Stripe webhook secret captured.${NC}"
 echo ""
-echo -e "${GREEN}Add to .env if needed:${NC}"
-echo "  echo \"STRIPE_WEBHOOK_SECRET=$WEBHOOK_SECRET\" >> .env"
+echo -e "${CYAN}To view webhook events, run in another terminal:${NC}"
+echo "  tail -f $STRIPE_LOG"
 echo ""
-
-# Cleanup temp file
-rm "$TEMP_FILE"
 
 # Cleanup function to kill stripe listen when script exits
 cleanup() {

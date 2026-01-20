@@ -12,7 +12,8 @@ const currentPath = Astro.url.pathname;
 const navItems = [
   { href: '/admin', label: 'Home' },
   { href: '/admin/events', label: 'Events' },
-  { href: '/admin/mixes', label: 'Mixes' },
+  // MVP: Mix functionality gated - uncomment to re-enable
+  // { href: '/admin/mixes', label: 'Mixes' },
   { href: '/admin/djs', label: 'DJs' },
   { href: '/admin/newsletter', label: 'Email' },
 ];
@@ -562,5 +563,17 @@ function isActive(href: string) {
     background: #a31b19;
     border-color: #a31b19;
     color: var(--color-bg);
+  }
+
+  .btn-warning {
+    background: #f9ab00;
+    border-color: #f9ab00;
+    color: #000;
+  }
+
+  .btn-warning:hover {
+    background: #e69c00;
+    border-color: #e69c00;
+    color: #000;
   }
 </style>

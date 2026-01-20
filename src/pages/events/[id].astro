@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Footer from '../../components/public/Footer.astro';
 import TicketTier from '../../components/public/TicketTier.astro';
+import HouseRulesModal from '../../components/public/HouseRulesModal.astro';
 import { getEventWithDetails } from '../../lib/supabase';
 
 const { id } = Astro.params;
@@ -149,6 +150,7 @@ const nextEventDate = !isPast ? event.date : null;
       </div>
     </div>
 
+    {!isPast && tiers.length > 0 && <HouseRulesModal />}
   </main>
   <Footer nextEventDate={nextEventDate} />
 </Base>

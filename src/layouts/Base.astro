@@ -2,8 +2,9 @@
 import { Font } from 'astro:assets';
 import { ViewTransitions } from 'astro:transitions';
 import '../styles/global.css';
-import PersistentPlayer from '../components/public/PersistentPlayer.astro';
-import { getPublishedMixes } from '../lib/supabase';
+// MVP: Mix functionality gated - uncomment to re-enable
+// import PersistentPlayer from '../components/public/PersistentPlayer.astro';
+// import { getPublishedMixes } from '../lib/supabase';
 
 interface Props {
   title?: string;
@@ -12,13 +13,13 @@ interface Props {
 
 const {
   title = 'VERBS',
-  description = 'Events and mixes from VERBS collective'
+  description = 'Events from VERBS collective'
 } = Astro.props;
 
 const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world/';
 
-// Fetch mixes for the persistent player
-const mixes = await getPublishedMixes();
+// MVP: Mix functionality gated - uncomment to re-enable
+// const mixes = await getPublishedMixes();
 ---
 
 <!doctype html>
@@ -37,7 +38,8 @@ const mixes = await getPublishedMixes();
     <title>{title}</title>
   </head>
   <body>
-    <PersistentPlayer mixes={mixes} />
+    <!-- MVP: Mix functionality gated - uncomment to re-enable -->
+    <!-- <PersistentPlayer mixes={mixes} /> -->
     <slot />
   </body>
 </html>

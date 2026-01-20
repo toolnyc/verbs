@@ -213,162 +213,207 @@ const firstMix = mixes[0];
     isPlaying: boolean;
   }
 
+  declare global {
+    interface Window {
+      __playerListenersAdded?: boolean;
+      __playerState?: {
+        mixes: Mix[];
+        currentIndex: number;
+      };
+    }
+  }
+
   const STORAGE_KEY = 'verbsPlayerState';
 
-  function initPlayer() {
+  // Shared player state
+  function getPlayerState() {
+    if (!window.__playerState) {
+      const playerEl = document.getElementById('persistentPlayer');
+      const mixes: Mix[] = playerEl ? JSON.parse(playerEl.dataset.mixes || '[]') : [];
+      window.__playerState = { mixes, currentIndex: 0 };
+    }
+    return window.__playerState;
+  }
+
+  function formatTime(seconds: number): string {
+    if (!seconds || !isFinite(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function saveState() {
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    const { mixes, currentIndex } = getPlayerState();
+    if (!audio || mixes.length === 0) return;
+
+    const state: PlayerState = {
+      currentMixId: mixes[currentIndex]?.id || null,
+      currentTime: audio.currentTime || 0,
+      isPlaying: !audio.paused
+    };
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function loadState(): PlayerState | null {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  }
+
+  function updateUI() {
+    const playerEl = document.getElementById('persistentPlayer');
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    if (!playerEl || !audio) return;
+
+    const isPlaying = !audio.paused;
+    playerEl.classList.toggle('playing', isPlaying);
+  }
+
+  function updateProgress() {
+    const playerEl = document.getElementById('persistentPlayer');
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    if (!playerEl || !audio) return;
+
+    const timeEls = playerEl.querySelectorAll('.player-time');
+    const progressFill = playerEl.querySelector('.player-progress-fill') as HTMLElement;
+
+    const current = formatTime(audio.currentTime);
+    const duration = formatTime(audio.duration);
+    const percent = (audio.currentTime / audio.duration) * 100 || 0;
+
+    timeEls.forEach(el => {
+      el.textContent = `${current} / ${duration}`;
+    });
+
+    if (progressFill) {
+      progressFill.style.width = `${percent}%`;
+    }
+  }
+
+  function updateTitle(title: string) {
     const playerEl = document.getElementById('persistentPlayer');
     if (!playerEl) return;
 
-    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
-    const mixes: Mix[] = JSON.parse(playerEl.dataset.mixes || '[]');
-
-    if (mixes.length === 0) return;
-
     const titleEls = playerEl.querySelectorAll('.player-title');
-    const timeEls = playerEl.querySelectorAll('.player-time');
-    const progressFill = playerEl.querySelector('.player-progress-fill') as HTMLElement;
-    const progressWrap = playerEl.querySelector('.player-progress-wrap') as HTMLElement;
-    const playBtn = playerEl.querySelector('.player-play')!;
-    const prevBtn = playerEl.querySelector('.player-prev')!;
-    const nextBtn = playerEl.querySelector('.player-next')!;
+    titleEls.forEach(el => {
+      el.textContent = title;
+    });
+  }
 
-    let currentIndex = 0;
+  function selectMix(index: number, autoPlay = false) {
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    const state = getPlayerState();
+    const { mixes } = state;
+
+    if (index < 0 || index >= mixes.length || !audio) return;
+
+    const mix = mixes[index];
+    state.currentIndex = index;
+
+    updateTitle(mix.title);
+
+    if (audio.src !== mix.audio_url) {
+      audio.src = mix.audio_url;
+    }
+
+    if (autoPlay) {
+      audio.play();
+    }
+
+    updateUI();
+    saveState();
+  }
+
+  function togglePlay() {
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    const { mixes, currentIndex } = getPlayerState();
+    if (!audio || mixes.length === 0) return;
+
+    if (!audio.src) {
+      audio.src = mixes[currentIndex].audio_url;
+    }
+
+    if (audio.paused) {
+      audio.play();
+    } else {
+      audio.pause();
+    }
+    updateUI();
+    saveState();
+  }
+
+  function playNext() {
+    const { mixes, currentIndex } = getPlayerState();
+    const next = (currentIndex + 1) % mixes.length;
+    selectMix(next, true);
+  }
+
+  function playPrev() {
+    const { mixes, currentIndex } = getPlayerState();
+    const prev = currentIndex <= 0 ? mixes.length - 1 : currentIndex - 1;
+    selectMix(prev, true);
+  }
+
+  function seekTo(percent: number) {
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    if (audio?.duration) {
+      audio.currentTime = (percent / 100) * audio.duration;
+      saveState();
+    }
+  }
+
+  // Event delegation for player controls
+  function handlePlayerClick(e: Event) {
+    const target = e.target as HTMLElement;
+
+    if (target.closest('.player-play')) {
+      togglePlay();
+      return;
+    }
+
+    if (target.closest('.player-prev')) {
+      playPrev();
+      return;
+    }
+
+    if (target.closest('.player-next')) {
+      playNext();
+      return;
+    }
+
+    const progressWrap = target.closest('.player-progress-wrap') as HTMLElement;
+    if (progressWrap) {
+      const rect = progressWrap.getBoundingClientRect();
+      const percent = (((e as MouseEvent).clientX - rect.left) / rect.width) * 100;
+      seekTo(percent);
+      return;
+    }
+  }
+
+  // Initialize player state and restore from session
+  function initPlayerState() {
+    const playerEl = document.getElementById('persistentPlayer');
+    if (!playerEl) return;
 
     // Add body padding for the player (44px height)
     document.body.style.paddingTop = '44px';
 
-    function formatTime(seconds: number): string {
-      if (!seconds || !isFinite(seconds)) return '0:00';
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+    // Reset state with current mixes data
+    const mixes: Mix[] = JSON.parse(playerEl.dataset.mixes || '[]');
+    window.__playerState = { mixes, currentIndex: 0 };
 
-    function saveState() {
-      const state: PlayerState = {
-        currentMixId: mixes[currentIndex].id,
-        currentTime: audio.currentTime || 0,
-        isPlaying: !audio.paused
-      };
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
+    if (mixes.length === 0) return;
 
-    function loadState(): PlayerState | null {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : null;
-    }
-
-    function updateUI() {
-      const isPlaying = !audio.paused;
-      playerEl.classList.toggle('playing', isPlaying);
-    }
-
-    function updateProgress() {
-      const current = formatTime(audio.currentTime);
-      const duration = formatTime(audio.duration);
-      const percent = (audio.currentTime / audio.duration) * 100 || 0;
-
-      // Update all time elements in the marquee
-      timeEls.forEach(el => {
-        el.textContent = `${current} / ${duration}`;
-      });
-
-      // Update progress bar
-      if (progressFill) {
-        progressFill.style.width = `${percent}%`;
-      }
-    }
-
-    function updateTitle(title: string) {
-      titleEls.forEach(el => {
-        el.textContent = title;
-      });
-    }
-
-    function selectMix(index: number, autoPlay = false) {
-      if (index < 0 || index >= mixes.length) return;
-
-      const mix = mixes[index];
-      currentIndex = index;
-
-      updateTitle(mix.title);
-
-      if (audio.src !== mix.audio_url) {
-        audio.src = mix.audio_url;
-      }
-
-      if (autoPlay) {
-        audio.play();
-      }
-
-      updateUI();
-      saveState();
-    }
-
-    function togglePlay() {
-      if (!audio.src) {
-        audio.src = mixes[currentIndex].audio_url;
-      }
-
-      if (audio.paused) {
-        audio.play();
-      } else {
-        audio.pause();
-      }
-      updateUI();
-      saveState();
-    }
-
-    function playNext() {
-      const next = (currentIndex + 1) % mixes.length;
-      selectMix(next, true);
-    }
-
-    function playPrev() {
-      const prev = currentIndex <= 0 ? mixes.length - 1 : currentIndex - 1;
-      selectMix(prev, true);
-    }
-
-    function seekTo(percent: number) {
-      if (audio.duration) {
-        audio.currentTime = (percent / 100) * audio.duration;
-        saveState();
-      }
-    }
-
-    // Event listeners
-    playBtn.addEventListener('click', togglePlay);
-    prevBtn.addEventListener('click', playPrev);
-    nextBtn.addEventListener('click', playNext);
-
-    // Click on progress bar to seek
-    progressWrap?.addEventListener('click', (e) => {
-      const rect = progressWrap.getBoundingClientRect();
-      const percent = ((e.clientX - rect.left) / rect.width) * 100;
-      seekTo(percent);
-    });
-
-    // Audio events
-    audio.addEventListener('timeupdate', updateProgress);
-    audio.addEventListener('play', () => { updateUI(); saveState(); });
-    audio.addEventListener('pause', () => { updateUI(); saveState(); });
-    audio.addEventListener('ended', playNext);
-
-    // View Transitions state persistence
-    document.addEventListener('astro:before-swap', saveState);
-    document.addEventListener('astro:after-swap', () => {
-      setTimeout(() => initPlayer(), 0);
-    });
-
-    // Restore state on load
+    // Restore state from session
     const savedState = loadState();
     if (savedState?.currentMixId) {
       const index = mixes.findIndex(m => m.id === savedState.currentMixId);
       if (index >= 0) {
-        currentIndex = index;
+        window.__playerState.currentIndex = index;
         updateTitle(mixes[index].title);
 
-        if (savedState.isPlaying || savedState.currentTime > 0) {
+        const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+        if (audio && (savedState.isPlaying || savedState.currentTime > 0)) {
           audio.src = mixes[index].audio_url;
           if (savedState.currentTime > 0) {
             audio.currentTime = savedState.currentTime;
@@ -383,5 +428,27 @@ const firstMix = mixes[0];
     }
   }
 
-  initPlayer();
+  // Set up event listeners only once
+  if (!window.__playerListenersAdded) {
+    // Click delegation for controls
+    document.addEventListener('click', handlePlayerClick);
+
+    // Audio events - these need to be on the audio element
+    const audio = document.getElementById('globalAudio') as HTMLAudioElement;
+    if (audio) {
+      audio.addEventListener('timeupdate', updateProgress);
+      audio.addEventListener('play', () => { updateUI(); saveState(); });
+      audio.addEventListener('pause', () => { updateUI(); saveState(); });
+      audio.addEventListener('ended', playNext);
+    }
+
+    // View Transitions state persistence
+    document.addEventListener('astro:before-swap', saveState);
+    document.addEventListener('astro:page-load', initPlayerState);
+
+    window.__playerListenersAdded = true;
+  }
+
+  // Initialize on first load
+  initPlayerState();
 </script>

@@ -1,0 +1,175 @@
+---
+// House Rules Modal - render once per page where ticket purchase is available
+---
+
+<div id="house-rules-modal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-content">
+    <h2 class="modal-title">House Rules</h2>
+
+    <div class="rules-section">
+      <h3 class="rules-heading">Photography</h3>
+      <ul class="rules-list">
+        <li>Be present &mdash; please keep phone use off the dance floor. A sticker will be placed on your phone cameras upon entry.</li>
+        <li>No professional cameras.</li>
+        <li>Please respect this policy as you'll be respecting the space and people around you.</li>
+        <li>This policy is required for entry.</li>
+      </ul>
+    </div>
+
+    <div class="rules-section">
+      <h3 class="rules-heading">Entry Requirements</h3>
+      <ul class="rules-list">
+        <li>Minimum age for entry is 21.</li>
+        <li>Outside food and alcohol is prohibited.</li>
+        <li>You will be searched at the door. If you do not agree, you will be denied entry.</li>
+      </ul>
+    </div>
+
+    <div class="rules-section">
+      <h3 class="rules-heading">Safety & Conduct</h3>
+      <ul class="rules-list">
+        <li>Safety, well-being, and inclusivity is a priority. We have a zero-tolerance policy towards aggression, discrimination, harassment, or any form of violence. This means no racism, queer-phobia, bullying, sexual misconduct, anti-semitism, etc.</li>
+        <li>Open use of, possession or trade of illegal substances is prohibited and will result in immediate removal.</li>
+        <li>Possession or trade of weapons is prohibited.</li>
+        <li>Report any concerns to our security or members behind the bar.</li>
+      </ul>
+    </div>
+
+    <div class="rules-section">
+      <h3 class="rules-heading">Liability</h3>
+      <ul class="rules-list">
+        <li>VERBS is not responsible for lost or stolen goods. If you lost something, email info@verbs-mia.com after the event.</li>
+        <li>VERBS does not bear responsibility for any injury or medical issues suffered onsite. If necessary, we will call first responders. Any expenses incurred will be the responsibility of the individual.</li>
+      </ul>
+    </div>
+
+    <div class="modal-actions">
+      <label class="agreement-label">
+        <input type="checkbox" id="rules-agreement" />
+        <span>I agree to the house rules</span>
+      </label>
+      <div class="action-buttons">
+        <button type="button" class="cancel-btn secondary" data-close-modal>Cancel</button>
+        <button type="button" class="proceed-btn" id="proceed-checkout" disabled>Proceed to checkout</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+
+  .modal[aria-hidden="false"] {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .modal-content {
+    position: relative;
+    background: var(--color-bg);
+    padding: var(--space-xl);
+    max-width: 560px;
+    width: calc(100% - var(--space-xl) * 2);
+    max-height: calc(100vh - var(--space-xl) * 2);
+    overflow-y: auto;
+  }
+
+  .modal-title {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-xl);
+  }
+
+  .rules-section {
+    margin-bottom: var(--space-lg);
+  }
+
+  .rules-heading {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+    margin-bottom: var(--space-sm);
+  }
+
+  .rules-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .rules-list li {
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .rules-list li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--color-muted);
+  }
+
+  .modal-actions {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .agreement-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    cursor: pointer;
+    font-size: var(--text-sm);
+  }
+
+  .agreement-label input[type="checkbox"] {
+    width: auto;
+    margin-top: 2px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+  }
+
+  .action-buttons button {
+    flex: 1;
+  }
+
+  .proceed-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .proceed-btn:not(:disabled) {
+    background: var(--color-green);
+    border-color: var(--color-green);
+    color: var(--color-fg);
+  }
+
+  .proceed-btn:not(:disabled):hover {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-bg);
+  }
+</style>

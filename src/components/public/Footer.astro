@@ -87,6 +87,7 @@ const { nextEventDate } = Astro.props;
   declare global {
     interface Window {
       _countdownInterval?: number;
+      __footerListenersAdded?: boolean;
     }
   }
 
@@ -151,78 +152,94 @@ const { nextEventDate } = Astro.props;
     window._countdownInterval = window.setInterval(updateCountdown, 1000);
   }
 
+  // Event delegation click handler for footer interactions
+  function handleFooterClick(e: Event) {
+    const target = e.target as HTMLElement;
+
+    // Desktop expand toggle
+    if (target.closest('#footer-expand-toggle')) {
+      const footerDesktop = document.getElementById('footer-desktop');
+      footerDesktop?.classList.toggle('expanded');
+      return;
+    }
+
+    // Mobile menu open
+    if (target.closest('#footer-menu-toggle')) {
+      const menuOverlay = document.getElementById('footer-menu-overlay');
+      menuOverlay?.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    // Mobile menu close
+    if (target.closest('#footer-menu-close')) {
+      const menuOverlay = document.getElementById('footer-menu-overlay');
+      menuOverlay?.classList.remove('open');
+      document.body.style.overflow = '';
+      return;
+    }
+
+    // Close menu when clicking a link inside overlay
+    const overlayLink = target.closest('#footer-menu-overlay a');
+    if (overlayLink) {
+      const menuOverlay = document.getElementById('footer-menu-overlay');
+      menuOverlay?.classList.remove('open');
+      document.body.style.overflow = '';
+      return;
+    }
+  }
+
+  // Event delegation submit handler for footer newsletter forms
+  async function handleFooterSubmit(e: Event) {
+    const target = e.target as HTMLElement;
+    const form = target.closest('.site-footer .newsletter-form, #footer-menu-overlay .newsletter-form') as HTMLFormElement;
+    if (!form) return;
+
+    e.preventDefault();
+    const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement;
+    const statusEl = form.querySelector('.newsletter-status') as HTMLElement;
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    if (!emailInput || !statusEl || !submitBtn) return;
+
+    const email = emailInput.value;
+    submitBtn.disabled = true;
+    statusEl.textContent = '...';
+
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      if (res.ok) {
+        statusEl.textContent = 'Subscribed!';
+        emailInput.value = '';
+      } else {
+        const data = await res.json();
+        statusEl.textContent = data.error || 'Error';
+      }
+    } catch {
+      statusEl.textContent = 'Error';
+    }
+
+    submitBtn.disabled = false;
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  }
+
   // Initialize countdown
   initCountdown();
 
-  // Re-initialize after ViewTransitions
+  // Re-initialize countdown after ViewTransitions
   document.addEventListener('astro:page-load', initCountdown);
 
-  // Desktop footer expand/collapse
-  const footerDesktop = document.getElementById('footer-desktop');
-  const expandToggle = document.getElementById('footer-expand-toggle');
-
-  expandToggle?.addEventListener('click', () => {
-    footerDesktop?.classList.toggle('expanded');
-  });
-
-  // Mobile menu toggle
-  const menuToggle = document.getElementById('footer-menu-toggle');
-  const menuClose = document.getElementById('footer-menu-close');
-  const menuOverlay = document.getElementById('footer-menu-overlay');
-
-  menuToggle?.addEventListener('click', () => {
-    menuOverlay?.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  });
-
-  menuClose?.addEventListener('click', () => {
-    menuOverlay?.classList.remove('open');
-    document.body.style.overflow = '';
-  });
-
-  // Close menu when clicking a link
-  menuOverlay?.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-      menuOverlay?.classList.remove('open');
-      document.body.style.overflow = '';
-    });
-  });
-
-  // Newsletter form handling
-  document.querySelectorAll('.newsletter-form').forEach(form => {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formEl = e.target as HTMLFormElement;
-      const emailInput = formEl.querySelector('input[name="email"]') as HTMLInputElement;
-      const statusEl = formEl.querySelector('.newsletter-status') as HTMLElement;
-      const submitBtn = formEl.querySelector('button[type="submit"]') as HTMLButtonElement;
-
-      const email = emailInput.value;
-      submitBtn.disabled = true;
-      statusEl.textContent = '...';
-
-      try {
-        const res = await fetch('/api/newsletter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-
-        if (res.ok) {
-          statusEl.textContent = 'Subscribed!';
-          emailInput.value = '';
-        } else {
-          const data = await res.json();
-          statusEl.textContent = data.error || 'Error';
-        }
-      } catch {
-        statusEl.textContent = 'Error';
-      }
-
-      submitBtn.disabled = false;
-      setTimeout(() => { statusEl.textContent = ''; }, 3000);
-    });
-  });
+  // Only add event delegation listeners once
+  if (!window.__footerListenersAdded) {
+    document.addEventListener('click', handleFooterClick);
+    document.addEventListener('submit', handleFooterSubmit);
+    window.__footerListenersAdded = true;
+  }
 </script>
 
 <style>
