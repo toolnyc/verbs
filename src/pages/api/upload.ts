@@ -63,6 +63,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const blob = await put(filename, file, {
       access: 'public',
       contentType: file.type,
+      token: import.meta.env.BLOB_READ_WRITE_TOKEN,
     });
 
     return new Response(

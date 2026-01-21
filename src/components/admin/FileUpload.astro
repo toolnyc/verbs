@@ -64,13 +64,16 @@ const inputId = `upload-${name}`;
     gap: var(--space-md);
   }
 
-  .preview {
+  .preview,
+  :global(.preview) {
     max-width: 200px;
   }
 
-  .image-preview img {
+  .image-preview img,
+  :global(.image-preview img) {
     width: 100%;
     height: auto;
+    object-fit: contain;
   }
 
   .audio-preview audio {

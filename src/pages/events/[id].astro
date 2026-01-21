@@ -70,8 +70,8 @@ const nextEventDate = !isPast ? event.date : null;
 
     <div class="event-layout">
       <div class="event-image-wrapper img-hover-reveal">
-        {event.image_url && (
-          <img src={event.image_url} alt={event.title} class="event-image" />
+        {(event.flyer_url || event.image_url) && (
+          <img src={event.flyer_url || event.image_url} alt={event.title} class="event-image" />
         )}
       </div>
 
@@ -204,27 +204,35 @@ const nextEventDate = !isPast ? event.date : null;
 
   .event-layout {
     flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    min-height: 100vh;
+    display: block;
   }
 
   .event-image-wrapper {
-    position: relative;
-    min-height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .event-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
   }
 
   .event-details {
+    margin-left: 50%;
     padding: var(--space-4xl);
     display: flex;
     flex-direction: column;
     justify-content: center;
+    min-height: 100vh;
   }
 
   .event-header {
@@ -325,13 +333,16 @@ const nextEventDate = !isPast ? event.date : null;
   }
 
   @media (max-width: 768px) {
-    .event-layout {
-      grid-template-columns: 1fr;
+    .event-image-wrapper {
+      position: relative;
+      width: 100%;
+      height: auto;
     }
 
-    .event-image-wrapper {
-      height: 50vh;
-      min-height: auto;
+    .event-image {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
     }
 
     .back-link {
@@ -339,7 +350,9 @@ const nextEventDate = !isPast ? event.date : null;
     }
 
     .event-details {
+      margin-left: 0;
       padding: var(--space-xl);
+      min-height: auto;
     }
 
     .event-title {

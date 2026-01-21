@@ -38,8 +38,8 @@ const formattedYear = eventDate.getFullYear();
 
 <section class="hero" class:list={{ past: isPast }}>
   <div class="hero-image-wrapper img-hover-reveal">
-    {event.image_url && (
-      <img src={event.image_url} alt={event.title} class="hero-bg-image" />
+    {(event.flyer_url || event.image_url) && (
+      <img src={event.flyer_url || event.image_url} alt={event.title} class="hero-bg-image" />
     )}
   </div>
 

@@ -23,18 +23,18 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
         <div class="hover-bg"></div>
         <span class="verb-title">{event.title}</span>
         {isDraft && <span class="draft-badge">Draft</span>}
-        {event.image_url && (
+        {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
-            <img src={event.image_url} alt={event.title} />
+            <img src={event.flyer_url || event.image_url} alt={event.title} />
           </div>
         )}
       </a>
     ) : (
       <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
         <span class="verb-title">{event.title}</span>
-        {event.image_url && (
+        {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
-            <img src={event.image_url} alt={event.title} />
+            <img src={event.flyer_url || event.image_url} alt={event.title} />
           </div>
         )}
       </div>

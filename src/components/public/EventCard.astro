@@ -31,8 +31,8 @@ const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
 
 <article class="event-card card-hover" class:list={{ past: isPast, compact }}>
   <div class="event-image-wrapper img-hover-reveal">
-    {event.image_url ? (
-      <img src={event.image_url} alt={event.title} class="event-image" />
+    {(event.flyer_url || event.image_url) ? (
+      <img src={event.flyer_url || event.image_url} alt={event.title} class="event-image" />
     ) : (
       <div class="event-image img-placeholder"></div>
     )}
