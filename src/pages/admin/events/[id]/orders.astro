@@ -7,6 +7,7 @@ const { id } = Astro.params;
 
 let event: any = null;
 let orders: any[] = [];
+let tiers: any[] = [];
 let error = '';
 let success = '';
 
@@ -28,15 +29,24 @@ if (supabaseAdmin && id) {
     .order('created_at', { ascending: false });
 
   orders = ordersData || [];
+
+  // Fetch tiers for guestlist form
+  const { data: tiersData } = await supabaseAdmin
+    .from('ticket_tiers')
+    .select('id, name')
+    .eq('event_id', id)
+    .order('sort_order');
+
+  tiers = tiersData || [];
 }
 
-// Handle refund
+// Handle form submissions
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
   const action = formData.get('action');
-  const orderId = formData.get('order_id') as string;
 
   if (action === 'refund') {
+    const orderId = formData.get('order_id') as string;
     const order = orders.find(o => o.id === orderId);
 
     if (order && order.stripe_payment_intent_id) {
@@ -58,6 +68,68 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
       } catch (err: any) {
         error = err.message;
       }
+    }
+  }
+
+  if (action === 'add_guestlist') {
+    const customerName = formData.get('customer_name') as string;
+    const customerEmail = formData.get('customer_email') as string;
+    const tierId = formData.get('tier_id') as string;
+    const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
+
+    if (!customerName || !customerEmail || !tierId) {
+      error = 'Name, email, and ticket tier are required';
+    } else {
+      // Create guestlist order
+      const { error: insertError } = await supabaseAdmin
+        .from('orders')
+        .insert({
+          event_id: id,
+          ticket_tier_id: tierId,
+          stripe_session_id: `guestlist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          customer_email: customerEmail,
+          customer_name: customerName,
+          quantity,
+          amount_paid: 0,
+          status: 'guestlist',
+        });
+
+      if (insertError) {
+        error = insertError.message;
+      } else {
+        success = `${customerName} added to guestlist`;
+
+        // Refresh orders
+        const { data: refreshed } = await supabaseAdmin
+          .from('orders')
+          .select('*, tier:ticket_tiers(name)')
+          .eq('event_id', id)
+          .order('created_at', { ascending: false });
+        orders = refreshed || [];
+      }
+    }
+  }
+
+  if (action === 'remove_guestlist') {
+    const orderId = formData.get('order_id') as string;
+    const { error: deleteError } = await supabaseAdmin
+      .from('orders')
+      .delete()
+      .eq('id', orderId)
+      .eq('status', 'guestlist'); // Only allow deleting guestlist entries
+
+    if (deleteError) {
+      error = deleteError.message;
+    } else {
+      success = 'Removed from guestlist';
+
+      // Refresh orders
+      const { data: refreshed } = await supabaseAdmin
+        .from('orders')
+        .select('*, tier:ticket_tiers(name)')
+        .eq('event_id', id)
+        .order('created_at', { ascending: false });
+      orders = refreshed || [];
     }
   }
 }
@@ -83,16 +155,18 @@ function formatCurrency(amount: number) {
 }
 
 // Calculate totals
-const totalRevenue = orders
-  .filter(o => o.status === 'completed')
+const paidOrders = orders.filter(o => o.status === 'completed');
+const guestlistOrders = orders.filter(o => o.status === 'guestlist');
+
+const totalRevenue = paidOrders
   .reduce((sum, o) => sum + (o.amount_paid - (o.refunded_amount || 0)), 0);
 
-const totalTickets = orders
-  .filter(o => o.status === 'completed')
-  .reduce((sum, o) => sum + o.quantity, 0);
+const totalPaidTickets = paidOrders.reduce((sum, o) => sum + o.quantity, 0);
+const totalGuestlistTickets = guestlistOrders.reduce((sum, o) => sum + o.quantity, 0);
+const totalAttendees = totalPaidTickets + totalGuestlistTickets;
 ---
 
-<Admin title={`Orders: ${event.title}`}>
+<Admin title={`Attendees: ${event.title}`}>
   <div class="page-header-extended">
     <a href={`/admin/events/${id}`} class="back-link text-sm">Back to Event</a>
   </div>
@@ -106,76 +180,144 @@ const totalTickets = orders
       <p class="stat-value">{formatCurrency(totalRevenue)}</p>
     </div>
     <div class="stat-card">
-      <p class="stat-label">Tickets Sold</p>
-      <p class="stat-value">{totalTickets}</p>
+      <p class="stat-label">Paid Tickets</p>
+      <p class="stat-value">{totalPaidTickets}</p>
     </div>
     <div class="stat-card">
-      <p class="stat-label">Orders</p>
-      <p class="stat-value">{orders.length}</p>
+      <p class="stat-label">Guestlist</p>
+      <p class="stat-value">{totalGuestlistTickets}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">Total Attendees</p>
+      <p class="stat-value">{totalAttendees}</p>
     </div>
   </div>
 
-  {orders.length > 0 ? (
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Customer</th>
-          <th>Tier</th>
-          <th>Qty</th>
-          <th>Amount</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {orders.map(order => (
-          <tr>
-            <td class="text-sm">{formatDate(order.created_at)}</td>
-            <td>
-              <div class="customer-info">
-                <span class="customer-email">{order.customer_email}</span>
-                {order.customer_name && (
-                  <span class="customer-name text-sm text-muted">{order.customer_name}</span>
-                )}
-              </div>
-            </td>
-            <td>{order.tier?.name}</td>
-            <td>{order.quantity}</td>
-            <td>
-              {formatCurrency(order.amount_paid)}
-              {order.refunded_amount > 0 && (
-                <span class="refunded text-sm text-muted">
-                  (-{formatCurrency(order.refunded_amount)})
-                </span>
-              )}
-            </td>
-            <td>
-              <span class:list={['status-badge', order.status]}>
-                {order.status}
-              </span>
-            </td>
-            <td>
-              {order.status === 'completed' && order.stripe_payment_intent_id && (
-                <form method="POST" class="refund-form">
-                  <input type="hidden" name="action" value="refund" />
-                  <input type="hidden" name="order_id" value={order.id} />
-                  <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Issue full refund?')">
-                    Refund
-                  </button>
-                </form>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <div class="empty-state">
-      <p class="text-muted">No orders yet for this event</p>
+  <div class="page-sections">
+    <!-- Guestlist Form -->
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h2 class="admin-card-title">Add to Guestlist</h2>
+      </div>
+      <form method="POST" class="guestlist-form">
+        <input type="hidden" name="action" value="add_guestlist" />
+        <div class="form-row-inline">
+          <input type="text" name="customer_name" placeholder="Name *" required />
+          <input type="email" name="customer_email" placeholder="Email *" required />
+          <select name="tier_id" required>
+            <option value="">Select tier...</option>
+            {tiers.map(tier => (
+              <option value={tier.id}>{tier.name}</option>
+            ))}
+          </select>
+          <input type="number" name="quantity" value="1" min="1" max="10" class="qty-input" />
+          <button type="submit">Add</button>
+        </div>
+      </form>
     </div>
-  )}
+
+    <!-- Search -->
+    <div class="search-bar">
+      <input
+        type="text"
+        id="attendee-search"
+        placeholder="Search by name, email, or order #..."
+        class="search-input"
+      />
+    </div>
+
+    <!-- Attendee Table -->
+    {orders.length > 0 ? (
+      <table class="admin-table" id="attendee-table">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Tier</th>
+            <th>Qty</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map(order => (
+            <tr data-search={`${order.order_number || ''} ${order.customer_name || ''} ${order.customer_email}`.toLowerCase()}>
+              <td class="text-sm order-num" data-label="Order">{order.order_number ? `#${order.order_number}` : '—'}</td>
+              <td class="customer-name-cell">{order.customer_name || '—'}</td>
+              <td class="customer-email-cell" data-label="Email">{order.customer_email}</td>
+              <td data-label="Tier">{order.tier?.name}</td>
+              <td data-label="Qty">{order.quantity}</td>
+              <td data-label="Amount">
+                {order.status === 'guestlist' ? (
+                  <span class="text-muted">—</span>
+                ) : (
+                  <>
+                    {formatCurrency(order.amount_paid)}
+                    {order.refunded_amount > 0 && (
+                      <span class="refunded text-sm text-muted">
+                        (-{formatCurrency(order.refunded_amount)})
+                      </span>
+                    )}
+                  </>
+                )}
+              </td>
+              <td>
+                <span class:list={['status-badge', order.status]}>
+                  {order.status === 'guestlist' ? 'Guestlist' : order.status}
+                </span>
+              </td>
+              <td>
+                {order.status === 'completed' && order.stripe_payment_intent_id && (
+                  <form method="POST" class="refund-form">
+                    <input type="hidden" name="action" value="refund" />
+                    <input type="hidden" name="order_id" value={order.id} />
+                    <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Issue full refund?')">
+                      Refund
+                    </button>
+                  </form>
+                )}
+                {order.status === 'guestlist' && (
+                  <form method="POST" class="refund-form">
+                    <input type="hidden" name="action" value="remove_guestlist" />
+                    <input type="hidden" name="order_id" value={order.id} />
+                    <button type="submit" class="btn-sm secondary" onclick="return confirm('Remove from guestlist?')">
+                      Remove
+                    </button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <div class="empty-state">
+        <p class="text-muted">No attendees yet for this event</p>
+      </div>
+    )}
+  </div>
 </Admin>
+
+<script>
+  // Client-side search filtering
+  const searchInput = document.getElementById('attendee-search') as HTMLInputElement;
+  const table = document.getElementById('attendee-table') as HTMLTableElement;
+
+  if (searchInput && table) {
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase().trim();
+      const rows = table.querySelectorAll('tbody tr');
+
+      rows.forEach(row => {
+        const searchData = (row as HTMLElement).dataset.search || '';
+        const matches = !query || searchData.includes(query);
+        (row as HTMLElement).style.display = matches ? '' : 'none';
+      });
+    });
+  }
+</script>
 
 <style>
   .page-header-extended {
@@ -186,13 +328,67 @@ const totalTickets = orders
     color: var(--color-muted);
   }
 
-  .customer-info {
+  .page-sections {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: var(--space-lg);
   }
 
-  .customer-email {
+  .guestlist-form {
+    padding: var(--space-md) 0 0;
+  }
+
+  .form-row-inline {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .form-row-inline input,
+  .form-row-inline select {
+    padding: var(--space-sm);
+    font-size: var(--text-sm);
+  }
+
+  .form-row-inline input[type="text"],
+  .form-row-inline input[type="email"] {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  .form-row-inline select {
+    min-width: 140px;
+  }
+
+  .qty-input {
+    width: 60px !important;
+    min-width: 60px !important;
+    flex: none !important;
+  }
+
+  .form-row-inline button {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-sm);
+  }
+
+  .search-bar {
+    background: var(--color-bg);
+    padding: var(--space-md);
+  }
+
+  .search-input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-base);
+  }
+
+  .order-num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .customer-name-cell {
     font-weight: 500;
   }
 
@@ -207,6 +403,11 @@ const totalTickets = orders
   .status-badge.completed {
     background: #e6f4ea;
     color: #137333;
+  }
+
+  .status-badge.guestlist {
+    background: #e8f0fe;
+    color: #1a73e8;
   }
 
   .status-badge.refunded {
@@ -235,5 +436,101 @@ const totalTickets = orders
     background: #e6f4ea;
     color: #137333;
     padding: var(--space-md);
+  }
+
+  @media (max-width: 768px) {
+    .form-row-inline {
+      flex-direction: column;
+    }
+
+    .form-row-inline input,
+    .form-row-inline select {
+      width: 100%;
+    }
+
+    .qty-input {
+      width: 100% !important;
+    }
+
+    /* Mobile table transformation */
+    .admin-table thead {
+      display: none;
+    }
+
+    .admin-table,
+    .admin-table tbody {
+      display: block;
+    }
+
+    .admin-table tr {
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-md);
+      margin-bottom: var(--space-sm);
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      gap: var(--space-xs);
+    }
+
+    .admin-table tr:hover td {
+      background: transparent;
+    }
+
+    .admin-table td {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      align-items: baseline;
+      padding: var(--space-xs) 0;
+      border-bottom: none;
+      gap: var(--space-sm);
+    }
+
+    .admin-table td::before {
+      content: attr(data-label);
+      font-size: var(--text-xs);
+      color: var(--color-muted);
+      font-weight: 500;
+      text-align: left;
+    }
+
+    /* Customer name should be prominent */
+    .customer-name-cell {
+      display: block;
+      order: -2;
+      font-size: var(--text-base);
+      font-weight: 600;
+    }
+
+    .customer-name-cell::before {
+      display: none;
+    }
+
+    /* Status badge row */
+    .admin-table td:has(.status-badge) {
+      display: block;
+      order: -1;
+    }
+
+    .admin-table td:has(.status-badge)::before {
+      display: none;
+    }
+
+    /* Email handling */
+    .customer-email-cell {
+      word-break: break-all;
+    }
+
+    /* Actions at the bottom */
+    .admin-table td:last-child {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: var(--space-sm);
+      margin-top: var(--space-xs);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .admin-table td:last-child::before {
+      display: none;
+    }
   }
 </style>

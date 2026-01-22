@@ -1,0 +1,196 @@
+---
+import Base from '../layouts/Base.astro';
+import { supabaseAdmin } from '../lib/supabase';
+
+const orderNumber = Astro.url.searchParams.get('order');
+
+let orderDetails: {
+  orderNumber: number;
+  customerName: string | null;
+  customerEmail: string;
+  eventTitle: string;
+  eventDate: Date;
+  eventTimezone: string;
+  venueName: string;
+  venueCity: string;
+  tierName: string;
+  quantity: number;
+  amountPaid: number;
+  status: string;
+} | null = null;
+
+let error: string | null = null;
+
+if (!orderNumber) {
+  error = 'No order number provided';
+} else if (!supabaseAdmin) {
+  error = 'Service unavailable';
+} else {
+  try {
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        *,
+        event:events(*),
+        tier:ticket_tiers(name)
+      `)
+      .eq('order_number', parseInt(orderNumber, 10))
+      .single();
+
+    if (orderError || !order) {
+      error = 'Order not found';
+    } else {
+      orderDetails = {
+        orderNumber: order.order_number,
+        customerName: order.customer_name,
+        customerEmail: order.customer_email,
+        eventTitle: order.event?.title || 'Unknown Event',
+        eventDate: new Date(order.event?.date),
+        eventTimezone: order.event?.timezone || 'America/New_York',
+        venueName: order.event?.venue_name || '',
+        venueCity: order.event?.venue_city || '',
+        tierName: order.tier?.name || 'Unknown Tier',
+        quantity: order.quantity,
+        amountPaid: order.amount_paid,
+        status: order.status,
+      };
+    }
+  } catch (err) {
+    console.error('Error fetching order:', err);
+    error = 'Could not retrieve order';
+  }
+}
+
+const formattedDate = orderDetails?.eventDate.toLocaleDateString('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+
+const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: orderDetails?.eventTimezone,
+});
+
+const statusColors: Record<string, string> = {
+  completed: '#137333',
+  guestlist: '#1a73e8',
+  refunded: '#c5221f',
+  partially_refunded: '#e37400',
+};
+---
+
+<Base title="Verify Order - VERBS" description="Order verification">
+  <main class="verify-page">
+    <div class="verify-content">
+      {error ? (
+        <div class="error-state">
+          <h1 class="text-3xl">Order Not Found</h1>
+          <p class="text-muted mt-md">{error}</p>
+        </div>
+      ) : orderDetails && (
+        <div class="verify-state">
+          <div class="status-badge" style={`background: ${statusColors[orderDetails.status] || '#666'}`}>
+            {orderDetails.status === 'guestlist' ? 'GUESTLIST' : orderDetails.status.toUpperCase()}
+          </div>
+
+          <h1 class="order-number mt-lg">#{orderDetails.orderNumber}</h1>
+
+          <div class="order-summary mt-xl">
+            <div class="summary-row">
+              <span class="summary-label">Event</span>
+              <span class="summary-value">{orderDetails.eventTitle}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Date</span>
+              <span class="summary-value">{formattedDate} @ {formattedTime}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Name</span>
+              <span class="summary-value">{orderDetails.customerName || '—'}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Email</span>
+              <span class="summary-value">{orderDetails.customerEmail}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Tickets</span>
+              <span class="summary-value">{orderDetails.tierName} × {orderDetails.quantity}</span>
+            </div>
+            {orderDetails.status !== 'guestlist' && (
+              <div class="summary-row">
+                <span class="summary-label">Paid</span>
+                <span class="summary-value">${orderDetails.amountPaid.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </main>
+</Base>
+
+<style>
+  .verify-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+  }
+
+  .verify-content {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+
+  .error-state {
+    padding: var(--space-2xl);
+    background: var(--color-bg-alt);
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: var(--space-xs) var(--space-lg);
+    color: white;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .order-number {
+    font-size: var(--text-5xl);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .order-summary {
+    text-align: left;
+    background: var(--color-bg-alt);
+    padding: var(--space-lg);
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .summary-row:last-child {
+    border-bottom: none;
+  }
+
+  .summary-label {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .summary-value {
+    font-weight: 500;
+    text-align: right;
+  }
+</style>

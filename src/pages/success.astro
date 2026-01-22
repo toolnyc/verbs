@@ -3,10 +3,13 @@ import Base from '../layouts/Base.astro';
 import Footer from '../components/public/Footer.astro';
 import { stripe } from '../lib/stripe';
 import { supabaseAdmin } from '../lib/supabase';
+import QRCode from 'qrcode';
 
 const sessionId = Astro.url.searchParams.get('session_id');
+const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world').replace(/\/$/, '');
 
 let orderDetails: {
+  orderNumber: number | null;
   customerName: string | null;
   customerEmail: string;
   eventTitle: string;
@@ -40,14 +43,16 @@ if (!sessionId) {
       if (!eventId || !tierId) {
         error = 'Order details not found';
       } else {
-        // Fetch event and tier details
-        const [{ data: event }, { data: tier }] = await Promise.all([
+        // Fetch event, tier, and order details
+        const [{ data: event }, { data: tier }, { data: order }] = await Promise.all([
           supabaseAdmin.from('events').select('*').eq('id', eventId).single(),
           supabaseAdmin.from('ticket_tiers').select('name').eq('id', tierId).single(),
+          supabaseAdmin.from('orders').select('order_number').eq('stripe_session_id', sessionId).single(),
         ]);
 
         if (event && tier) {
           orderDetails = {
+            orderNumber: order?.order_number || null,
             customerName: session.customer_details?.name || null,
             customerEmail: session.customer_details?.email || '',
             eventTitle: event.title,
@@ -83,6 +88,26 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
   hour12: false,
   timeZone: orderDetails?.eventTimezone,
 });
+
+// Generate QR code data URL
+const verifyUrl = orderDetails?.orderNumber
+  ? `${siteUrl}/verify?order=${orderDetails.orderNumber}`
+  : null;
+let qrCodeDataUrl: string | null = null;
+if (verifyUrl) {
+  try {
+    qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
+      width: 200,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+  } catch (err) {
+    console.error('Error generating QR code:', err);
+  }
+}
 ---
 
 <Base title="Order Confirmed - VERBS" description="Your ticket purchase was successful">
@@ -99,9 +124,19 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
           <div class="success-header">
             <p class="text-sm text-muted">Order confirmed</p>
             <h1 class="display-text mt-sm">You're in</h1>
+            {orderDetails.orderNumber && (
+              <p class="order-number mt-md">Order #{orderDetails.orderNumber}</p>
+            )}
           </div>
 
-          <div class="order-details mt-3xl">
+          {qrCodeDataUrl && (
+            <div class="qr-section mt-xl">
+              <img src={qrCodeDataUrl} alt="Order QR Code" class="qr-code" width="150" height="150" />
+              <p class="text-xs text-muted mt-sm">Show this at the door</p>
+            </div>
+          )}
+
+          <div class="order-details mt-xl">
             <div class="detail-row">
               <span class="detail-label text-sm text-muted">Event</span>
               <span class="detail-value text-2xl">{orderDetails.eventTitle}</span>
@@ -133,13 +168,16 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
             </div>
           </div>
 
-          <div class="confirmation-note mt-3xl">
+          <div class="confirmation-note mt-xl">
             <p class="text-sm text-muted">
               A confirmation email has been sent to <strong>{orderDetails.customerEmail}</strong>
             </p>
           </div>
 
-          <a href="/" class="back-button mt-xl">Back to events</a>
+          <div class="action-buttons mt-xl">
+            <button type="button" class="print-button" onclick="window.print()">Save / Print</button>
+            <a href="/" class="back-button">Back to events</a>
+          </div>
         </div>
       )}
     </div>
@@ -170,6 +208,24 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
     font-size: var(--text-5xl);
   }
 
+  .order-number {
+    font-size: var(--text-lg);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .qr-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .qr-code {
+    border: 1px solid var(--color-border);
+    padding: var(--space-sm);
+    background: white;
+  }
+
   .order-details {
     text-align: left;
     border-top: 1px solid var(--color-border);
@@ -196,14 +252,38 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
     color: var(--color-fg);
   }
 
+  .action-buttons {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .print-button,
   .back-button {
     display: inline-block;
     padding: var(--space-sm) var(--space-lg);
     border: 1px solid var(--color-fg);
-    background: var(--color-fg);
-    color: var(--color-bg);
     font-weight: 500;
     transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+  }
+
+  .print-button {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  .print-button:hover {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .back-button {
+    background: var(--color-fg);
+    color: var(--color-bg);
   }
 
   .back-button:hover {
@@ -218,6 +298,33 @@ const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {
   @media (max-width: 768px) {
     .success-header .display-text {
       font-size: var(--text-4xl);
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .success-page {
+      min-height: auto;
+      padding: 0;
+    }
+
+    .site-footer,
+    .action-buttons,
+    .noise-overlay {
+      display: none !important;
+    }
+
+    .success-content {
+      max-width: 100%;
+    }
+
+    .qr-code {
+      width: 120px;
+      height: 120px;
+    }
+
+    .order-details {
+      page-break-inside: avoid;
     }
   }
 </style>

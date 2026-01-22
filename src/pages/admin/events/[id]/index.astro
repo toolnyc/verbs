@@ -69,6 +69,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         venue_link: formData.get('venue_link') || null,
         image_url: formData.get('flyer_url') || null,
         flyer_url: formData.get('flyer_url') || null,
+        hover_color: formData.get('hover_color') || null,
         status: formData.get('status'),
         updated_at: new Date().toISOString(),
       })
@@ -340,13 +341,26 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} />
         </div>
 
-        <div class="form-group">
-          <label for="status" class="form-label">Status</label>
-          <select id="status" name="status">
-            <option value="draft" selected={event.status === 'draft'}>Draft</option>
-            <option value="published" selected={event.status === 'published'}>Published</option>
-            <option value="archived" selected={event.status === 'archived'}>Archived</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status">
+              <option value="draft" selected={event.status === 'draft'}>Draft</option>
+              <option value="published" selected={event.status === 'published'}>Published</option>
+              <option value="archived" selected={event.status === 'archived'}>Archived</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hover_color" class="form-label">Hover Color</label>
+            <select id="hover_color" name="hover_color">
+              <option value="" selected={!event.hover_color}>Default (Black)</option>
+              <option value="#f20519" selected={event.hover_color === '#f20519'}>Red</option>
+              <option value="#f2b705" selected={event.hover_color === '#f2b705'}>Yellow</option>
+              <option value="#1bf59f" selected={event.hover_color === '#1bf59f'}>Green</option>
+            </select>
+            <p class="form-hint">Color shown on hover in the event grid</p>
+          </div>
         </div>
 
         <div class="form-actions">
@@ -426,63 +440,61 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           <h2 class="admin-card-title">Lineup</h2>
         </div>
 
-        {eventDjs.length > 0 && (
-          <div class="djs-list">
-            {eventDjs.map(ed => (
-              <div class="dj-item">
-                <div class="dj-info">
-                  <span class="dj-name">{ed.dj?.name}</span>
-                  <form method="POST" class="dj-times-form">
-                    <input type="hidden" name="action" value="update_dj_times" />
-                    <input type="hidden" name="event_dj_id" value={ed.id} />
-                    <div class="time-inputs">
-                      <input
-                        type="time"
-                        name="slot_start"
-                        value={ed.slot_start || ''}
-                        placeholder="Start"
-                        class="time-input"
-                      />
-                      <span class="time-separator">—</span>
-                      <input
-                        type="time"
-                        name="slot_end"
-                        value={ed.slot_end || ''}
-                        placeholder="End"
-                        class="time-input"
-                      />
-                      <button type="submit" class="btn-sm">Save</button>
-                    </div>
-                  </form>
-                </div>
-                <form method="POST" class="inline-form">
-                  <input type="hidden" name="action" value="remove_dj" />
+        <div class="djs-list" id="djs-list">
+          {eventDjs.map(ed => (
+            <div class="dj-item" data-event-dj-id={ed.id}>
+              <div class="dj-info">
+                <span class="dj-name">{ed.dj?.name}</span>
+                <form method="POST" class="dj-times-form">
+                  <input type="hidden" name="action" value="update_dj_times" />
                   <input type="hidden" name="event_dj_id" value={ed.id} />
-                  <button type="submit" class="btn-sm secondary">Remove</button>
+                  <div class="time-inputs">
+                    <input
+                      type="time"
+                      name="slot_start"
+                      value={ed.slot_start || ''}
+                      placeholder="Start"
+                      class="time-input"
+                    />
+                    <span class="time-separator">—</span>
+                    <input
+                      type="time"
+                      name="slot_end"
+                      value={ed.slot_end || ''}
+                      placeholder="End"
+                      class="time-input"
+                    />
+                    <button type="submit" class="btn-sm">Save</button>
+                  </div>
                 </form>
               </div>
-            ))}
-          </div>
-        )}
+              <form method="POST" class="inline-form">
+                <input type="hidden" name="action" value="remove_dj" />
+                <input type="hidden" name="event_dj_id" value={ed.id} />
+                <button type="submit" class="btn-sm secondary">Remove</button>
+              </form>
+            </div>
+          ))}
+        </div>
 
-        <form method="POST" class="add-dj-form">
-          <input type="hidden" name="action" value="add_dj" />
+        <form class="add-dj-form" id="add-dj-form" data-event-id={id}>
           <h4 class="text-sm mt-lg mb-sm">Add DJ</h4>
           {availableDjs.length > 0 && (
-            <select name="dj_id" class="mb-sm">
+            <select name="dj_id" id="dj-select" class="mb-sm">
               <option value="">Select existing DJ...</option>
               {availableDjs.map(dj => (
                 <option value={dj.id}>{dj.name}</option>
               ))}
             </select>
           )}
-          <input type="text" name="new_dj_name" placeholder="Or create new DJ..." class="mb-sm" />
+          <input type="text" name="new_dj_name" id="new-dj-name" placeholder="Or create new DJ..." class="mb-sm" />
           <div class="time-inputs mb-sm">
-            <input type="time" name="slot_start" placeholder="Start time" class="time-input" />
+            <input type="time" name="slot_start" id="slot-start" placeholder="Start time" class="time-input" />
             <span class="time-separator">—</span>
-            <input type="time" name="slot_end" placeholder="End time" class="time-input" />
+            <input type="time" name="slot_end" id="slot-end" placeholder="End time" class="time-input" />
           </div>
-          <button type="submit" class="btn-sm">Add to Lineup</button>
+          <button type="submit" class="btn-sm" id="add-dj-btn">Add to Lineup</button>
+          <span class="add-dj-status text-sm ml-sm" id="add-dj-status"></span>
         </form>
       </div>
 
@@ -648,4 +660,135 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   .action-link {
     font-size: var(--text-sm);
   }
+
+  .add-dj-status {
+    color: var(--color-muted);
+  }
+
+  .add-dj-status.success {
+    color: #137333;
+  }
+
+  .add-dj-status.error {
+    color: #c5221f;
+  }
 </style>
+
+<script>
+  // AJAX DJ form submission to preserve other form state
+  const addDjForm = document.getElementById('add-dj-form') as HTMLFormElement;
+
+  if (addDjForm) {
+    addDjForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const eventId = addDjForm.dataset.eventId;
+      const djSelect = document.getElementById('dj-select') as HTMLSelectElement;
+      const newDjName = document.getElementById('new-dj-name') as HTMLInputElement;
+      const slotStart = document.getElementById('slot-start') as HTMLInputElement;
+      const slotEnd = document.getElementById('slot-end') as HTMLInputElement;
+      const submitBtn = document.getElementById('add-dj-btn') as HTMLButtonElement;
+      const statusEl = document.getElementById('add-dj-status') as HTMLElement;
+
+      const djId = djSelect?.value || '';
+      const newName = newDjName?.value?.trim() || '';
+
+      if (!djId && !newName) {
+        statusEl.textContent = 'Select a DJ or enter a new name';
+        statusEl.className = 'add-dj-status text-sm ml-sm error';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = 'Adding...';
+      statusEl.className = 'add-dj-status text-sm ml-sm';
+
+      try {
+        const res = await fetch('/api/admin/event-djs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_id: eventId,
+            dj_id: djId || undefined,
+            new_dj_name: newName || undefined,
+            slot_start: slotStart?.value || undefined,
+            slot_end: slotEnd?.value || undefined,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          // Add the new DJ to the list
+          const djsList = document.getElementById('djs-list');
+          if (djsList && data.eventDj) {
+            const djItem = createDjItemElement(data.eventDj);
+            djsList.appendChild(djItem);
+          }
+
+          // If a new DJ was created, add to select (if select exists)
+          if (data.newDj && djSelect) {
+            const option = document.createElement('option');
+            option.value = data.newDj.id;
+            option.textContent = data.newDj.name;
+            djSelect.appendChild(option);
+          }
+
+          // Remove the added DJ from select options
+          if (djId && djSelect) {
+            const option = djSelect.querySelector(`option[value="${djId}"]`);
+            if (option) option.remove();
+          }
+
+          // Clear form inputs
+          if (djSelect) djSelect.value = '';
+          if (newDjName) newDjName.value = '';
+          if (slotStart) slotStart.value = '';
+          if (slotEnd) slotEnd.value = '';
+
+          statusEl.textContent = 'Added!';
+          statusEl.className = 'add-dj-status text-sm ml-sm success';
+          setTimeout(() => { statusEl.textContent = ''; }, 2000);
+        } else {
+          statusEl.textContent = data.error || 'Failed to add DJ';
+          statusEl.className = 'add-dj-status text-sm ml-sm error';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Network error';
+        statusEl.className = 'add-dj-status text-sm ml-sm error';
+      }
+
+      submitBtn.disabled = false;
+    });
+  }
+
+  // Create a DJ item element dynamically
+  function createDjItemElement(eventDj: any) {
+    const div = document.createElement('div');
+    div.className = 'dj-item';
+    div.dataset.eventDjId = eventDj.id;
+
+    div.innerHTML = `
+      <div class="dj-info">
+        <span class="dj-name">${eventDj.dj?.name || 'Unknown'}</span>
+        <form method="POST" class="dj-times-form">
+          <input type="hidden" name="action" value="update_dj_times" />
+          <input type="hidden" name="event_dj_id" value="${eventDj.id}" />
+          <div class="time-inputs">
+            <input type="time" name="slot_start" value="${eventDj.slot_start || ''}" placeholder="Start" class="time-input" />
+            <span class="time-separator">—</span>
+            <input type="time" name="slot_end" value="${eventDj.slot_end || ''}" placeholder="End" class="time-input" />
+            <button type="submit" class="btn-sm">Save</button>
+          </div>
+        </form>
+      </div>
+      <form method="POST" class="inline-form">
+        <input type="hidden" name="action" value="remove_dj" />
+        <input type="hidden" name="event_dj_id" value="${eventDj.id}" />
+        <button type="submit" class="btn-sm secondary">Remove</button>
+      </form>
+    `;
+
+    return div;
+  }
+</script>

@@ -38,9 +38,44 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <title>{title}</title>
   </head>
   <body>
+    <!-- SVG noise filter for texture overlay -->
+    <svg class="noise-filter" aria-hidden="true">
+      <filter id="noise">
+        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+    </svg>
+    <div class="noise-overlay" aria-hidden="true"></div>
+
     <!-- MVP: Mix functionality gated - uncomment to re-enable -->
     <!-- <PersistentPlayer mixes={mixes} /> -->
     <slot />
   </body>
 </html>
+
+<style is:global>
+  /* Noise texture overlay - subtle inkbleed effect */
+  .noise-filter {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  .noise-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.035;
+    mix-blend-mode: multiply;
+    filter: url(#noise);
+  }
+
+  /* Disable on reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .noise-overlay {
+      display: none;
+    }
+  }
+</style>
 

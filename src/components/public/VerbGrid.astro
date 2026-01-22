@@ -5,12 +5,13 @@ interface Props {
   events: Event[];
   isAuthenticated?: boolean;
   featuredEventId?: string | null;
+  nextEventDate?: string | null;
 }
 
-const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
+const { events, isAuthenticated = false, featuredEventId = null, nextEventDate = null } = Astro.props;
 ---
 
-<div class="verb-grid">
+<div class="verb-grid" data-next-event={nextEventDate || ''}>
   {events.map(event => {
     const isPublished = event.status === 'published';
     const isDraft = event.status === 'draft';
@@ -19,9 +20,14 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
     const isClickable = isPublished || (isDraft && isAuthenticated);
 
     return isClickable ? (
-      <a href={`/events/${event.id}`} class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}>
+      <a
+        href={`/events/${event.id}`}
+        class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}
+        data-hover-color={event.hover_color || ''}
+      >
         <div class="hover-bg"></div>
         <span class="verb-title">{event.title}</span>
+        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
         {isDraft && <span class="draft-badge">Draft</span>}
         {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
@@ -32,6 +38,7 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
     ) : (
       <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
         <span class="verb-title">{event.title}</span>
+        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
         {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
             <img src={event.flyer_url || event.image_url} alt={event.title} />
@@ -77,6 +84,21 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
     opacity: 0.8;
     z-index: 2;
   }
+
+  /* Featured countdown indicator */
+  .featured-countdown {
+    position: relative;
+    z-index: 1;
+    display: block;
+    font-size: var(--text-sm);
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+    margin-top: var(--space-xs);
+  }
+
+  .verb-item.featured .featured-countdown {
+    font-size: var(--text-base);
+  }
 </style>
 
 <script>
@@ -108,8 +130,12 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
       const title = item.querySelector('.verb-title') as HTMLElement;
       if (!hoverBg || !title) return;
 
-      // Reset any existing transforms
-      gsap.set(hoverBg, { y: '100%', skewY: 0 });
+      // Get custom hover color if set
+      const customColor = (item as HTMLElement).dataset.hoverColor;
+      const bgColor = customColor || 'var(--color-fg)';
+
+      // Reset any existing transforms and apply custom color
+      gsap.set(hoverBg, { y: '100%', skewY: 0, backgroundColor: bgColor });
       gsap.set(title, { clearProps: 'color' });
 
       // GSAP hover animation
@@ -148,9 +174,68 @@ const { events, isAuthenticated = false, featuredEventId = null } = Astro.props;
     });
   }
 
+  // Featured countdown logic
+  declare global {
+    interface Window {
+      _verbGridCountdownInterval?: number;
+    }
+  }
+
+  function updateFeaturedCountdown() {
+    const grid = document.querySelector('.verb-grid') as HTMLElement;
+    const nextEventDate = grid?.dataset.nextEvent;
+    const countdownEl = document.getElementById('featured-countdown');
+
+    if (!countdownEl || !nextEventDate) {
+      if (countdownEl) countdownEl.textContent = '';
+      return;
+    }
+
+    const now = new Date();
+    const eventDate = new Date(nextEventDate);
+    const diff = eventDate.getTime() - now.getTime();
+
+    if (isNaN(diff)) {
+      countdownEl.textContent = '';
+      return;
+    }
+
+    if (diff <= 0) {
+      countdownEl.textContent = 'Happening now';
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    let countdownText = '';
+    if (days > 0) {
+      countdownText = `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      countdownText = `${hours}h ${minutes}m`;
+    } else {
+      countdownText = `${minutes}m`;
+    }
+
+    countdownEl.textContent = countdownText;
+  }
+
+  function initFeaturedCountdown() {
+    if (window._verbGridCountdownInterval) {
+      clearInterval(window._verbGridCountdownInterval);
+    }
+    updateFeaturedCountdown();
+    window._verbGridCountdownInterval = window.setInterval(updateFeaturedCountdown, 60000); // Update every minute
+  }
+
   // Initialize on first load
   initVerbGridAnimations();
+  initFeaturedCountdown();
 
   // Re-initialize after Astro view transitions
-  document.addEventListener('astro:page-load', initVerbGridAnimations);
+  document.addEventListener('astro:page-load', () => {
+    initVerbGridAnimations();
+    initFeaturedCountdown();
+  });
 </script>

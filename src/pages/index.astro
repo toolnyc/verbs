@@ -35,7 +35,7 @@ const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
 
 <Base title="VERBS" description="Events and mixes from VERBS collective">
   <main>
-    <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} />
+    <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} nextEventDate={nextEventDate} />
   </main>
   <Footer nextEventDate={nextEventDate} />
 </Base>

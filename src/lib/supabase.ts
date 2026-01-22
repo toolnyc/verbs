@@ -35,6 +35,7 @@ export interface Event {
   venue_link: string | null;
   image_url: string | null;
   flyer_url: string | null;
+  hover_color: string | null;
   status: 'draft' | 'published' | 'archived';
   created_at: string;
   updated_at: string;
@@ -75,6 +76,7 @@ export interface EventDJ {
 
 export interface Order {
   id: string;
+  order_number: number;
   event_id: string;
   ticket_tier_id: string;
   stripe_session_id: string;
@@ -83,7 +85,7 @@ export interface Order {
   customer_name: string | null;
   quantity: number;
   amount_paid: number;
-  status: 'completed' | 'refunded' | 'partially_refunded';
+  status: 'completed' | 'refunded' | 'partially_refunded' | 'guestlist';
   refunded_amount: number;
   created_at: string;
 }

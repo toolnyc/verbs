@@ -83,7 +83,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Create Stripe checkout session
-    const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+    const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'http://localhost:4321').replace(/\/$/, '');
     const successUrl = `${siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/events/${event_id}`;
 
