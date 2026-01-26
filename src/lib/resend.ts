@@ -163,6 +163,7 @@ export async function sendTicketConfirmation({
 
   await resend.emails.send({
     from: 'VERBS <tickets@verbsaroundthe.world>',
+    replyTo: 'subscribe@verbs-mia.com',
     to,
     subject: `Your tickets for ${eventTitle}`,
     html,
@@ -211,6 +212,7 @@ export async function sendCampaign({
 
   await resend.emails.send({
     from: 'VERBS <hello@verbsaroundthe.world>',
+    replyTo: 'subscribe@verbs-mia.com',
     to,
     subject,
     html,
