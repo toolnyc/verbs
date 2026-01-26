@@ -40,7 +40,7 @@ export const POST: APIRoute = async ({ request }) => {
       }
 
       // Insert order (idempotent on stripe_session_id)
-      const { error: orderError } = await supabaseAdmin
+      const { data: orderData, error: orderError } = await supabaseAdmin
         .from('orders')
         .upsert(
           {
@@ -56,14 +56,18 @@ export const POST: APIRoute = async ({ request }) => {
           },
           {
             onConflict: 'stripe_session_id',
-            ignoreDuplicates: true,
+            ignoreDuplicates: false,
           }
-        );
+        )
+        .select('order_number')
+        .single();
 
       if (orderError) {
         console.error('Error inserting order:', orderError);
         // Don't return error - might be duplicate
       }
+
+      const orderNumber = orderData?.order_number || null;
 
       // Increment sold_count
       const { error: updateError } = await supabaseAdmin.rpc(
@@ -113,6 +117,7 @@ export const POST: APIRoute = async ({ request }) => {
             tierName: tierData.name,
             quantity,
             amountPaid: session.amount_total / 100,
+            orderNumber,
           });
         }
       } catch (emailErr) {
