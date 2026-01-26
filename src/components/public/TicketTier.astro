@@ -38,6 +38,7 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
       data-tier-id={tier.id}
       data-tier-name={tier.name}
       data-price={tier.price}
+      data-available={available}
     >
       Buy {formattedPrice}
     </button>
@@ -94,7 +95,14 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
 
 <script>
   // Store pending checkout details
-  let pendingCheckout: { eventId: string; tierId: string } | null = null;
+  let pendingCheckout: {
+    eventId: string;
+    tierId: string;
+    tierName: string;
+    price: number;
+    maxQuantity: number;
+    quantity: number;
+  } | null = null;
 
   function getModal() {
     return document.getElementById('house-rules-modal');
@@ -108,16 +116,54 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
     return document.getElementById('proceed-checkout') as HTMLButtonElement | null;
   }
 
-  function openModal(eventId: string, tierId: string) {
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  }
+
+  function updateModalDisplay() {
+    if (!pendingCheckout) return;
+
+    const tierNameEl = document.getElementById('modal-tier-name');
+    const tierPriceEl = document.getElementById('modal-tier-price');
+    const qtyValueEl = document.getElementById('qty-value');
+    const totalEl = document.getElementById('modal-total');
+    const decreaseBtn = document.getElementById('qty-decrease') as HTMLButtonElement;
+    const increaseBtn = document.getElementById('qty-increase') as HTMLButtonElement;
+
+    if (tierNameEl) tierNameEl.textContent = pendingCheckout.tierName;
+    if (tierPriceEl) tierPriceEl.textContent = `${formatCurrency(pendingCheckout.price)} each`;
+    if (qtyValueEl) qtyValueEl.textContent = String(pendingCheckout.quantity);
+    if (totalEl) totalEl.textContent = formatCurrency(pendingCheckout.price * pendingCheckout.quantity);
+
+    if (decreaseBtn) decreaseBtn.disabled = pendingCheckout.quantity <= 1;
+    if (increaseBtn) increaseBtn.disabled = pendingCheckout.quantity >= pendingCheckout.maxQuantity;
+  }
+
+  function openModal(eventId: string, tierId: string, tierName: string, price: number, available: number | null) {
     const modal = getModal();
     const checkbox = getCheckbox();
     const proceedBtn = getProceedBtn();
 
     if (!modal || !checkbox || !proceedBtn) return;
 
-    pendingCheckout = { eventId, tierId };
+    // Max 10 tickets per purchase, or available stock if lower
+    const maxQuantity = available !== null ? Math.min(10, available) : 10;
+
+    pendingCheckout = {
+      eventId,
+      tierId,
+      tierName,
+      price,
+      maxQuantity,
+      quantity: 1,
+    };
+
     checkbox.checked = false;
     proceedBtn.disabled = true;
+    updateModalDisplay();
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
   }
@@ -132,6 +178,16 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
     document.body.style.overflow = '';
     pendingCheckout = null;
     if (checkbox) checkbox.checked = false;
+  }
+
+  function changeQuantity(delta: number) {
+    if (!pendingCheckout) return;
+
+    const newQty = pendingCheckout.quantity + delta;
+    if (newQty >= 1 && newQty <= pendingCheckout.maxQuantity) {
+      pendingCheckout.quantity = newQty;
+      updateModalDisplay();
+    }
   }
 
   async function proceedToCheckout() {
@@ -151,7 +207,7 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
         body: JSON.stringify({
           event_id: pendingCheckout.eventId,
           ticket_tier_id: pendingCheckout.tierId,
-          quantity: 1,
+          quantity: pendingCheckout.quantity,
         }),
       });
 
@@ -177,9 +233,12 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
 
     const eventId = button.dataset.eventId;
     const tierId = button.dataset.tierId;
+    const tierName = button.dataset.tierName || 'Ticket';
+    const price = parseFloat(button.dataset.price || '0');
+    const available = button.dataset.available ? parseInt(button.dataset.available, 10) : null;
 
     if (eventId && tierId) {
-      openModal(eventId, tierId);
+      openModal(eventId, tierId, tierName, price, available);
     }
   }
 
@@ -195,6 +254,17 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
     // Close on cancel button
     if (target.hasAttribute('data-close-modal')) {
       closeModal();
+      return;
+    }
+
+    // Quantity controls
+    if (target.id === 'qty-decrease') {
+      changeQuantity(-1);
+      return;
+    }
+
+    if (target.id === 'qty-increase') {
+      changeQuantity(1);
       return;
     }
 

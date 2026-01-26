@@ -5,6 +5,25 @@
 <div id="house-rules-modal" class="modal" aria-hidden="true">
   <div class="modal-backdrop"></div>
   <div class="modal-content">
+    <div class="ticket-selection">
+      <div class="tier-header">
+        <span class="tier-name-display" id="modal-tier-name"></span>
+        <span class="tier-price-display" id="modal-tier-price"></span>
+      </div>
+      <div class="quantity-selector">
+        <span class="quantity-label">Quantity</span>
+        <div class="quantity-controls">
+          <button type="button" class="qty-btn" id="qty-decrease" aria-label="Decrease quantity">−</button>
+          <span class="qty-value" id="qty-value">1</span>
+          <button type="button" class="qty-btn" id="qty-increase" aria-label="Increase quantity">+</button>
+        </div>
+      </div>
+      <div class="total-row">
+        <span class="total-label">Total</span>
+        <span class="total-value" id="modal-total"></span>
+      </div>
+    </div>
+
     <h2 class="modal-title">House Rules</h2>
 
     <div class="rules-section">
@@ -89,6 +108,93 @@
     width: calc(100% - var(--space-xl) * 2);
     max-height: calc(100vh - var(--space-xl) * 2);
     overflow-y: auto;
+  }
+
+  .ticket-selection {
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+  }
+
+  .tier-name-display {
+    font-weight: 500;
+  }
+
+  .tier-price-display {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+  }
+
+  .quantity-selector {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+  }
+
+  .quantity-label {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .qty-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-lg);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .qty-btn:hover:not(:disabled) {
+    border-color: var(--color-fg);
+  }
+
+  .qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .qty-value {
+    min-width: 32px;
+    text-align: center;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .total-label {
+    font-weight: 500;
+  }
+
+  .total-value {
+    font-size: var(--text-lg);
+    font-weight: 500;
   }
 
   .modal-title {

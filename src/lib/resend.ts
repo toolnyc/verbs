@@ -2,8 +2,12 @@ import { Resend } from 'resend';
 import QRCode from 'qrcode';
 
 const resendApiKey = import.meta.env.RESEND_API_KEY;
-const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world').replace(/\/$/, '');
 const resendAudienceId = import.meta.env.RESEND_AUDIENCE_ID;
+
+// Get site URL at runtime to ensure correct environment URL
+function getSiteUrl(): string {
+  return (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world').replace(/\/$/, '');
+}
 
 export const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
@@ -112,9 +116,9 @@ export async function sendTicketConfirmation({
   let qrCodeHtml = '';
   if (orderNumber) {
     try {
-      const verifyUrl = `${siteUrl}/verify?order=${orderNumber}`;
+      const verifyUrl = `${getSiteUrl()}/verify?order=${orderNumber}`;
       const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
-        width: 150,
+        width: 100,
         margin: 1,
         color: {
           dark: '#000000',
@@ -122,10 +126,9 @@ export async function sendTicketConfirmation({
         },
       });
       qrCodeHtml = `
-        <div style="text-align: center; margin: 24px 0; padding: 20px; background: #f5f5f5;">
-          <img src="${qrCodeDataUrl}" alt="Ticket QR Code" width="150" height="150" style="display: block; margin: 0 auto;" />
-          <p style="margin: 12px 0 0 0; font-size: 14px; color: #666;">Show this QR code at the door</p>
-          <p style="margin: 4px 0 0 0; font-size: 12px; color: #999;">Order #${orderNumber}</p>
+        <div style="text-align: center; margin: 24px 0; padding: 16px; background: #f5f5f5;">
+          <img src="${qrCodeDataUrl}" alt="Ticket QR Code" width="100" height="100" style="display: block; margin: 0 auto;" />
+          <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">Show at door · Order #${orderNumber}</p>
         </div>
       `;
     } catch (err) {
@@ -157,8 +160,6 @@ export async function sendTicketConfirmation({
       <h1>You're in!</h1>
       <p>Hey${customerName ? ` ${customerName}` : ''},</p>
       <p>Your tickets for <strong>${eventTitle}</strong> are confirmed.</p>
-
-      ${qrCodeHtml}
 
       <div class="details">
         <div class="detail-row">
@@ -226,6 +227,8 @@ export async function sendTicketConfirmation({
 
       <p>See you there!</p>
 
+      ${qrCodeHtml}
+
       <div class="footer">
         <p>VERBS</p>
       </div>
@@ -258,7 +261,7 @@ export async function sendCampaign({
     return;
   }
 
-  const unsubscribeUrl = `${siteUrl}unsubscribe?token=${unsubscribeToken}`;
+  const unsubscribeUrl = `${getSiteUrl()}/unsubscribe?token=${unsubscribeToken}`;
 
   const html = `
     <!DOCTYPE html>
