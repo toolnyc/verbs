@@ -2,7 +2,7 @@
 import Admin from '../../../../layouts/Admin.astro';
 import FileUpload from '../../../../components/admin/FileUpload.astro';
 import { supabaseAdmin } from '../../../../lib/supabase';
-import { createProductAndPrice, updatePrice } from '../../../../lib/stripe';
+import { createProductAndPrice, updatePrice, updateProductName, archiveProduct } from '../../../../lib/stripe';
 
 const { id } = Astro.params;
 
@@ -56,10 +56,13 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
   const action = formData.get('action');
 
   if (action === 'update_event') {
+    const newTitle = formData.get('title') as string;
+    const titleChanged = newTitle !== event.title;
+
     const { error: updateError } = await supabaseAdmin
       .from('events')
       .update({
-        title: formData.get('title'),
+        title: newTitle,
         description: formData.get('description') || null,
         date: formData.get('date'),
         time_end: formData.get('time_end') || null,
@@ -78,7 +81,36 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     if (updateError) {
       error = updateError.message;
     } else {
-      success = 'Event updated';
+      // If title changed, update all Stripe products for this event's tiers
+      if (titleChanged) {
+        const { data: tiersWithStripe } = await supabaseAdmin
+          .from('ticket_tiers')
+          .select('stripe_product_id, name')
+          .eq('event_id', id)
+          .not('stripe_product_id', 'is', null);
+
+        if (tiersWithStripe && tiersWithStripe.length > 0) {
+          const stripeErrors: string[] = [];
+          for (const tier of tiersWithStripe) {
+            try {
+              await updateProductName({
+                productId: tier.stripe_product_id!,
+                eventTitle: newTitle,
+                tierName: tier.name,
+              });
+            } catch (stripeErr: any) {
+              stripeErrors.push(`${tier.name}: ${stripeErr.message}`);
+            }
+          }
+          if (stripeErrors.length > 0) {
+            error = `Event updated but Stripe sync failed: ${stripeErrors.join(', ')}`;
+          }
+        }
+      }
+
+      if (!error) {
+        success = 'Event updated';
+      }
       // Refresh event data
       const { data: refreshed } = await supabaseAdmin.from('events').select('*').eq('id', id).single();
       event = refreshed;
@@ -86,38 +118,50 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
   }
 
   if (action === 'add_tier') {
-    const tierData: any = {
-      event_id: id,
-      name: formData.get('tier_name'),
-      tier_type: formData.get('tier_type'),
-      price: parseFloat(formData.get('tier_price') as string),
-      max_stock: formData.get('tier_max_stock') ? parseInt(formData.get('tier_max_stock') as string) : null,
-      is_active: true,
-      sort_order: tiers.length,
-    };
+    const tierType = formData.get('tier_type') as string;
+    const tierName = formData.get('tier_name') as string;
+    const tierPrice = parseFloat(formData.get('tier_price') as string);
 
-    // Create Stripe product and price for online tiers
-    if (tierData.tier_type === 'online') {
+    // Insert tier first to get the ID
+    const { data: newTier, error: tierError } = await supabaseAdmin
+      .from('ticket_tiers')
+      .insert({
+        event_id: id,
+        name: tierName,
+        tier_type: tierType,
+        price: tierPrice,
+        max_stock: formData.get('tier_max_stock') ? parseInt(formData.get('tier_max_stock') as string) : null,
+        is_active: true,
+        sort_order: tiers.length,
+      })
+      .select()
+      .single();
+
+    if (tierError) {
+      error = tierError.message;
+    } else if (newTier && tierType === 'online') {
+      // Create Stripe product with proper metadata
       try {
         const { productId, priceId } = await createProductAndPrice({
+          eventId: id!,
+          tierId: newTier.id,
           eventTitle: event.title,
-          tierName: tierData.name,
-          price: tierData.price,
+          tierName: tierName,
+          price: tierPrice,
         });
-        tierData.stripe_product_id = productId;
-        tierData.stripe_price_id = priceId;
-      } catch (stripeErr: any) {
-        error = `Stripe error: ${stripeErr.message}`;
-      }
-    }
 
-    if (!error) {
-      const { error: tierError } = await supabaseAdmin.from('ticket_tiers').insert(tierData);
-      if (tierError) {
-        error = tierError.message;
-      } else {
+        // Update tier with Stripe IDs
+        await supabaseAdmin
+          .from('ticket_tiers')
+          .update({ stripe_product_id: productId, stripe_price_id: priceId })
+          .eq('id', newTier.id);
+
         success = 'Ticket tier added';
+      } catch (stripeErr: any) {
+        error = `Tier created but Stripe sync failed: ${stripeErr.message}`;
       }
+    } else {
+      success = 'Ticket tier added';
     }
 
     // Refresh tiers
@@ -127,7 +171,25 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
   }
 
   if (action === 'delete_tier') {
-    const tierId = formData.get('tier_id');
+    const tierId = formData.get('tier_id') as string;
+
+    // Fetch the tier to get Stripe product ID
+    const { data: tier } = await supabaseAdmin
+      .from('ticket_tiers')
+      .select('stripe_product_id')
+      .eq('id', tierId)
+      .single();
+
+    // Archive Stripe product if it exists
+    if (tier?.stripe_product_id) {
+      try {
+        await archiveProduct(tier.stripe_product_id);
+      } catch (stripeErr: any) {
+        // Log but don't block deletion - Stripe product may already be archived
+        console.error('Failed to archive Stripe product:', stripeErr.message);
+      }
+    }
+
     await supabaseAdmin.from('ticket_tiers').delete().eq('id', tierId);
     success = 'Tier deleted';
 
@@ -146,8 +208,91 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     tiers = refreshedTiers || [];
   }
 
+  if (action === 'update_tier') {
+    const tierId = formData.get('tier_id') as string;
+    const newName = formData.get('tier_name') as string;
+    const newPrice = parseFloat(formData.get('tier_price') as string);
+    const newMaxStock = formData.get('tier_max_stock')
+      ? parseInt(formData.get('tier_max_stock') as string)
+      : null;
+
+    // Fetch current tier to compare changes
+    const { data: currentTier } = await supabaseAdmin
+      .from('ticket_tiers')
+      .select('*')
+      .eq('id', tierId)
+      .single();
+
+    if (!currentTier) {
+      error = 'Tier not found';
+    } else {
+      const nameChanged = newName !== currentTier.name;
+      const priceChanged = newPrice !== currentTier.price;
+
+      // Update database first
+      const { error: updateError } = await supabaseAdmin
+        .from('ticket_tiers')
+        .update({
+          name: newName,
+          price: newPrice,
+          max_stock: newMaxStock,
+        })
+        .eq('id', tierId);
+
+      if (updateError) {
+        error = updateError.message;
+      } else {
+        const stripeErrors: string[] = [];
+
+        // Sync name change to Stripe if product exists
+        if (nameChanged && currentTier.stripe_product_id) {
+          try {
+            await updateProductName({
+              productId: currentTier.stripe_product_id,
+              eventTitle: event.title,
+              tierName: newName,
+            });
+          } catch (stripeErr: any) {
+            stripeErrors.push(`Name sync: ${stripeErr.message}`);
+          }
+        }
+
+        // Sync price change to Stripe if price exists
+        if (priceChanged && currentTier.stripe_product_id && currentTier.stripe_price_id) {
+          try {
+            const newPriceId = await updatePrice({
+              productId: currentTier.stripe_product_id,
+              oldPriceId: currentTier.stripe_price_id,
+              newPrice: newPrice,
+              eventId: id!,
+              tierId: tierId,
+            });
+
+            // Update the tier with new price ID
+            await supabaseAdmin
+              .from('ticket_tiers')
+              .update({ stripe_price_id: newPriceId })
+              .eq('id', tierId);
+          } catch (stripeErr: any) {
+            stripeErrors.push(`Price sync: ${stripeErr.message}`);
+          }
+        }
+
+        if (stripeErrors.length > 0) {
+          error = `Tier updated but Stripe sync failed: ${stripeErrors.join(', ')}`;
+        } else {
+          success = 'Tier updated';
+        }
+      }
+    }
+
+    const { data: refreshedTiers } = await supabaseAdmin
+      .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+    tiers = refreshedTiers || [];
+  }
+
   if (action === 'sync_tier_stripe') {
-    const tierId = formData.get('tier_id');
+    const tierId = formData.get('tier_id') as string;
 
     // Fetch the tier
     const { data: tier } = await supabaseAdmin
@@ -159,6 +304,8 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     if (tier && tier.tier_type === 'online' && !tier.stripe_price_id) {
       try {
         const { productId, priceId } = await createProductAndPrice({
+          eventId: id!,
+          tierId: tierId,
           eventTitle: event.title,
           tierName: tier.name,
           price: tier.price,
@@ -380,39 +527,55 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
         {tiers.length > 0 && (
           <div class="tiers-list">
             {tiers.map(tier => (
-              <div class:list={['tier-item', { inactive: !tier.is_active }]}>
-                <div class="tier-info">
-                  <span class="tier-name">{tier.name}</span>
-                  <span class="tier-price">${tier.price}</span>
-                  <span class="tier-type text-xs text-muted">{tier.tier_type}</span>
-                </div>
-                <div class="tier-stats">
-                  <span class="text-sm">{tier.sold_count} / {tier.max_stock || '∞'}</span>
-                </div>
-                <div class="tier-actions">
-                  {tier.tier_type === 'online' && !tier.stripe_price_id && (
+              <div class:list={['tier-item-wrapper', { inactive: !tier.is_active }]}>
+                <div class="tier-item">
+                  <div class="tier-info">
+                    <span class="tier-name">{tier.name}</span>
+                    <span class="tier-price">${tier.price}</span>
+                    <span class="tier-type text-xs text-muted">{tier.tier_type}</span>
+                  </div>
+                  <div class="tier-stats">
+                    <span class="text-sm">{tier.sold_count} / {tier.max_stock || '∞'}</span>
+                  </div>
+                  <div class="tier-actions">
+                    <button type="button" class="btn-sm tier-edit-toggle" data-tier-id={tier.id}>Edit</button>
+                    {tier.tier_type === 'online' && !tier.stripe_price_id && (
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action" value="sync_tier_stripe" />
+                        <input type="hidden" name="tier_id" value={tier.id} />
+                        <button type="submit" class="btn-sm btn-warning">Sync Stripe</button>
+                      </form>
+                    )}
                     <form method="POST" class="inline-form">
-                      <input type="hidden" name="action" value="sync_tier_stripe" />
+                      <input type="hidden" name="action" value="toggle_tier" />
                       <input type="hidden" name="tier_id" value={tier.id} />
-                      <button type="submit" class="btn-sm btn-warning">Sync Stripe</button>
+                      <input type="hidden" name="is_active" value={tier.is_active} />
+                      <button type="submit" class="btn-sm secondary">
+                        {tier.is_active ? 'Disable' : 'Enable'}
+                      </button>
                     </form>
-                  )}
-                  <form method="POST" class="inline-form">
-                    <input type="hidden" name="action" value="toggle_tier" />
-                    <input type="hidden" name="tier_id" value={tier.id} />
-                    <input type="hidden" name="is_active" value={tier.is_active} />
-                    <button type="submit" class="btn-sm secondary">
-                      {tier.is_active ? 'Disable' : 'Enable'}
-                    </button>
-                  </form>
-                  {tier.sold_count === 0 && (
-                    <form method="POST" class="inline-form">
-                      <input type="hidden" name="action" value="delete_tier" />
-                      <input type="hidden" name="tier_id" value={tier.id} />
-                      <button type="submit" class="btn-sm btn-danger">Delete</button>
-                    </form>
-                  )}
+                    {tier.sold_count === 0 && (
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action" value="delete_tier" />
+                        <input type="hidden" name="tier_id" value={tier.id} />
+                        <button type="submit" class="btn-sm btn-danger">Delete</button>
+                      </form>
+                    )}
+                  </div>
                 </div>
+                <form method="POST" class="tier-edit-form" id={`edit-tier-${tier.id}`} style="display: none;">
+                  <input type="hidden" name="action" value="update_tier" />
+                  <input type="hidden" name="tier_id" value={tier.id} />
+                  <div class="tier-form-grid">
+                    <input type="text" name="tier_name" value={tier.name} placeholder="Name" required />
+                    <input type="number" name="tier_price" value={tier.price} placeholder="Price" step="0.01" min="0" required />
+                    <input type="number" name="tier_max_stock" value={tier.max_stock || ''} placeholder="Stock (blank=unlimited)" min="0" />
+                    <button type="submit" class="btn-sm">Save</button>
+                  </div>
+                  {tier.stripe_price_id && (
+                    <p class="form-hint mt-sm">Changes will sync to Stripe automatically</p>
+                  )}
+                </form>
               </div>
             ))}
           </div>
@@ -565,17 +728,25 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
     gap: var(--space-sm);
   }
 
+  .tier-item-wrapper {
+    background: var(--color-bg-alt);
+  }
+
+  .tier-item-wrapper.inactive {
+    opacity: 0.5;
+  }
+
   .tier-item {
     display: grid;
     grid-template-columns: 1fr auto auto;
     gap: var(--space-sm);
     align-items: center;
     padding: var(--space-sm);
-    background: var(--color-bg-alt);
   }
 
-  .tier-item.inactive {
-    opacity: 0.5;
+  .tier-edit-form {
+    padding: var(--space-sm);
+    border-top: 1px solid var(--color-border);
   }
 
   .tier-info {
@@ -791,4 +962,17 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
     return div;
   }
+
+  // Toggle tier edit forms
+  document.querySelectorAll('.tier-edit-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tierId = (btn as HTMLElement).dataset.tierId;
+      const form = document.getElementById(`edit-tier-${tierId}`);
+      if (form) {
+        const isHidden = form.style.display === 'none';
+        form.style.display = isHidden ? 'block' : 'none';
+        btn.textContent = isHidden ? 'Cancel' : 'Edit';
+      }
+    });
+  });
 </script>

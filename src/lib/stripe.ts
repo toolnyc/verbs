@@ -49,10 +49,14 @@ export async function createCheckoutSession({
 }
 
 export async function createProductAndPrice({
+  eventId,
+  tierId,
   eventTitle,
   tierName,
   price,
 }: {
+  eventId: string;
+  tierId: string;
   eventTitle: string;
   tierName: string;
   price: number;
@@ -61,9 +65,14 @@ export async function createProductAndPrice({
     throw new Error('Stripe not configured');
   }
 
-  // Create product
+  // Create product with metadata for traceability
   const product = await stripe.products.create({
     name: `${eventTitle} - ${tierName}`,
+    metadata: {
+      event_id: eventId,
+      tier_id: tierId,
+      source: 'verbs',
+    },
   });
 
   // Create price (in cents)
@@ -71,6 +80,10 @@ export async function createProductAndPrice({
     product: product.id,
     unit_amount: Math.round(price * 100),
     currency: 'usd',
+    metadata: {
+      event_id: eventId,
+      tier_id: tierId,
+    },
   });
 
   return {
@@ -83,10 +96,14 @@ export async function updatePrice({
   productId,
   oldPriceId,
   newPrice,
+  eventId,
+  tierId,
 }: {
   productId: string;
   oldPriceId: string;
   newPrice: number;
+  eventId: string;
+  tierId: string;
 }) {
   if (!stripe) {
     throw new Error('Stripe not configured');
@@ -95,14 +112,66 @@ export async function updatePrice({
   // Archive old price
   await stripe.prices.update(oldPriceId, { active: false });
 
-  // Create new price
+  // Create new price with metadata
   const stripePrice = await stripe.prices.create({
     product: productId,
     unit_amount: Math.round(newPrice * 100),
     currency: 'usd',
+    metadata: {
+      event_id: eventId,
+      tier_id: tierId,
+    },
   });
 
   return stripePrice.id;
+}
+
+export async function updateProductName({
+  productId,
+  eventTitle,
+  tierName,
+}: {
+  productId: string;
+  eventTitle: string;
+  tierName: string;
+}) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  await stripe.products.update(productId, {
+    name: `${eventTitle} - ${tierName}`,
+  });
+}
+
+export async function archiveProduct(productId: string) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  // Archive the product (sets active: false)
+  // This also prevents the product from being used in new checkouts
+  await stripe.products.update(productId, { active: false });
+}
+
+export async function archiveProductsForEvent(eventId: string) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  // Search for all products with this event_id in metadata
+  const products = await stripe.products.search({
+    query: `metadata['event_id']:'${eventId}' AND metadata['source']:'verbs'`,
+  });
+
+  // Archive each product
+  for (const product of products.data) {
+    if (product.active) {
+      await stripe.products.update(product.id, { active: false });
+    }
+  }
+
+  return products.data.length;
 }
 
 export async function createRefund({

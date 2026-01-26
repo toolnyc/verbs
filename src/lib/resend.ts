@@ -149,8 +149,9 @@ export async function sendTicketConfirmation({
         .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
         .detail-row:last-child { border-bottom: none; }
         .label { color: #666; }
-        .rules { margin: 24px 0; padding: 20px; border: 1px solid #e0e0e0; }
-        .rules h3 { font-size: 14px; color: #666; margin: 0 0 8px 0; font-weight: 500; }
+        .rules { margin: 40px 0; padding: 24px; border: 1px solid #e0e0e0; }
+        .rules-title { font-size: 22px; font-weight: 600; margin: 0 0 20px 0; }
+        .rules h3 { font-size: 13px; color: #666; margin: 0 0 8px 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
         .rules ul { margin: 0; padding-left: 20px; }
         .rules li { font-size: 13px; margin-bottom: 6px; color: #333; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 14px; color: #666; }
@@ -189,9 +190,9 @@ export async function sendTicketConfirmation({
       </div>
 
       <div class="rules">
-        <h2 style="margin-top: 0;">House Rules</h2>
+        <h2 class="rules-title">House Rules</h2>
 
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 20px;">
           <h3>Photography</h3>
           <ul>
             <li>Be present — please keep phone use off the dance floor. A sticker will be placed on your phone cameras upon entry.</li>
@@ -199,7 +200,7 @@ export async function sendTicketConfirmation({
           </ul>
         </div>
 
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 20px;">
           <h3>Entry Requirements</h3>
           <ul>
             <li>Minimum age for entry is 21.</li>
@@ -208,7 +209,7 @@ export async function sendTicketConfirmation({
           </ul>
         </div>
 
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 20px;">
           <h3>Safety & Conduct</h3>
           <ul>
             <li>Zero-tolerance policy towards aggression, discrimination, harassment, or any form of violence.</li>
