@@ -486,7 +486,8 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
         <div class="form-group">
           <label for="venue_link" class="form-label">Venue Link</label>
-          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} />
+          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} placeholder="https://maps.google.com/..." />
+          <p class="form-hint">Google Maps URL for venue location</p>
         </div>
 
         <div class="form-row">
@@ -522,12 +523,19 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
         {event.door_only_mode && (
           <div class="door-qr-section">
-            <p class="text-sm text-muted mb-sm">Door checkout URL:</p>
-            <div class="qr-url-box">
-              <code class="qr-url" id="door-url">{`${Astro.url.origin}/door/${event.id}`}</code>
-              <button type="button" class="btn-sm copy-btn" id="copy-url-btn">Copy</button>
+            <div class="qr-preview">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${Astro.url.origin}/door/${event.id}`)}`}
+                alt="Door checkout QR code"
+                width="200"
+                height="200"
+              />
             </div>
-            <p class="text-xs text-muted mt-sm">Print this as a QR code for customers to scan at the door.</p>
+            <div class="qr-actions">
+              <a href={`/admin/events/${event.id}/qr`} class="btn-sm" target="_blank">Open Full Screen</a>
+              <button type="button" class="btn-sm secondary" id="copy-url-btn">Copy URL</button>
+            </div>
+            <code class="qr-url text-xs text-muted" id="door-url">{`${Astro.url.origin}/door/${event.id}`}</code>
           </div>
         )}
 
@@ -879,28 +887,33 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
   .door-qr-section {
     margin-top: var(--space-md);
-    padding: var(--space-md);
+    padding: var(--space-lg);
     background: var(--color-bg-alt);
     border: 1px solid var(--color-border);
+    text-align: center;
   }
 
-  .qr-url-box {
+  .qr-preview {
+    margin-bottom: var(--space-md);
+  }
+
+  .qr-preview img {
+    display: block;
+    margin: 0 auto;
+    background: white;
+    padding: var(--space-sm);
+  }
+
+  .qr-actions {
     display: flex;
     gap: var(--space-sm);
-    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--space-sm);
   }
 
   .qr-url {
-    flex: 1;
-    padding: var(--space-sm);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    font-size: var(--text-sm);
+    display: block;
     word-break: break-all;
-  }
-
-  .copy-btn {
-    white-space: nowrap;
   }
 </style>
 

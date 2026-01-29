@@ -32,63 +32,61 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     const isClickable = isPublished || (isDraft && isAuthenticated);
 
     return isClickable ? (
-      <a
-        href={`/events/${event.id}`}
-        class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}
-        data-hover-color={event.hover_color || ''}
-      >
-        <div class="hover-bg"></div>
-        {isFeatured && <span class="upcoming-label">Upcoming</span>}
-        <span class="verb-title">{event.title}</span>
-        {isFeatured && (
-          <div class="featured-cta">
-            <span class="featured-countdown" id="featured-countdown">--</span>
-            {featuredTier && (
-              <button
-                class="buy-btn featured-buy-btn"
-                data-event-id={event.id}
-                data-tier-id={featuredTier.id}
-                data-tier-name={featuredTier.name}
-                data-price={featuredTier.price}
-                data-available={featuredAvailable}
-              >
-                Buy {featuredPrice}
-              </button>
-            )}
-          </div>
+      <div class={`verb-item-wrapper ${isFeatured ? 'featured' : ''}`}>
+        <a
+          href={`/events/${event.id}`}
+          class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}
+          data-hover-color={event.hover_color || ''}
+        >
+          <div class="hover-bg"></div>
+          <span class="verb-title">
+            {event.title}
+            {isFeatured && <span class="featured-countdown" id="featured-countdown"> in --</span>}
+          </span>
+          {isDraft && <span class="draft-badge">Draft</span>}
+          {(event.flyer_url || event.image_url) && (
+            <div class="flyer-preview">
+              <img src={event.flyer_url || event.image_url} alt={event.title} />
+            </div>
+          )}
+        </a>
+        {isFeatured && featuredTier && (
+          <button
+            class="buy-btn featured-buy-btn"
+            data-event-id={event.id}
+            data-tier-id={featuredTier.id}
+            data-tier-name={featuredTier.name}
+            data-price={featuredTier.price}
+            data-available={featuredAvailable}
+          >
+            Buy {featuredPrice}
+          </button>
         )}
-        {isDraft && <span class="draft-badge">Draft</span>}
-        {(event.flyer_url || event.image_url) && (
-          <div class="flyer-preview">
-            <img src={event.flyer_url || event.image_url} alt={event.title} />
-          </div>
-        )}
-      </a>
+      </div>
     ) : (
-      <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
-        {isFeatured && <span class="upcoming-label">Upcoming</span>}
-        <span class="verb-title">{event.title}</span>
-        {isFeatured && (
-          <div class="featured-cta">
-            <span class="featured-countdown" id="featured-countdown">--</span>
-            {featuredTier && (
-              <button
-                class="buy-btn featured-buy-btn"
-                data-event-id={event.id}
-                data-tier-id={featuredTier.id}
-                data-tier-name={featuredTier.name}
-                data-price={featuredTier.price}
-                data-available={featuredAvailable}
-              >
-                Buy {featuredPrice}
-              </button>
-            )}
-          </div>
-        )}
-        {(event.flyer_url || event.image_url) && (
-          <div class="flyer-preview">
-            <img src={event.flyer_url || event.image_url} alt={event.title} />
-          </div>
+      <div class={`verb-item-wrapper ${isFeatured ? 'featured' : ''}`}>
+        <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
+          <span class="verb-title">
+            {event.title}
+            {isFeatured && <span class="featured-countdown" id="featured-countdown"> in --</span>}
+          </span>
+          {(event.flyer_url || event.image_url) && (
+            <div class="flyer-preview">
+              <img src={event.flyer_url || event.image_url} alt={event.title} />
+            </div>
+          )}
+        </div>
+        {isFeatured && featuredTier && (
+          <button
+            class="buy-btn featured-buy-btn"
+            data-event-id={event.id}
+            data-tier-id={featuredTier.id}
+            data-tier-name={featuredTier.name}
+            data-price={featuredTier.price}
+            data-available={featuredAvailable}
+          >
+            Buy {featuredPrice}
+          </button>
         )}
       </div>
     );
@@ -96,6 +94,19 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
 </div>
 
 <style>
+  /* Wrapper for featured items with buy button */
+  .verb-item-wrapper {
+    display: contents;
+  }
+
+  .verb-item-wrapper.featured {
+    display: flex;
+  }
+
+  .verb-item-wrapper.featured .verb-item {
+    flex: 1;
+  }
+
   .verb-item.draft {
     position: relative;
   }
@@ -131,49 +142,20 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     z-index: 2;
   }
 
-  /* Upcoming label for featured event */
-  .upcoming-label {
-    position: relative;
-    z-index: 1;
-    display: block;
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    opacity: 0.6;
-    margin-bottom: var(--space-xs);
-  }
-
-  /* Featured countdown indicator */
+  /* Featured countdown indicator - inline with title */
   .featured-countdown {
-    position: relative;
-    z-index: 1;
-    display: block;
-    font-size: var(--text-sm);
+    display: inline;
+    font-size: inherit;
     opacity: 0.6;
     font-variant-numeric: tabular-nums;
-    margin-top: var(--space-xs);
   }
 
-  .verb-item.featured .featured-countdown {
-    font-size: var(--text-base);
-  }
-
-  /* Featured CTA with countdown and buy button */
-  .featured-cta {
-    position: relative;
-    z-index: 1;
+  /* Featured buy button - right aligned, full height */
+  .featured-buy-btn {
+    align-self: stretch;
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    margin-top: var(--space-xs);
-  }
-
-  .featured-cta .featured-countdown {
-    margin-top: 0;
-  }
-
-  .featured-buy-btn {
-    padding: var(--space-sm) var(--space-lg);
+    padding: 0 var(--space-xl);
     font-size: var(--text-sm);
     white-space: nowrap;
     background: var(--color-green);
@@ -290,7 +272,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     }
 
     if (diff <= 0) {
-      countdownEl.textContent = 'Happening now';
+      countdownEl.textContent = ' now';
       return;
     }
 
@@ -300,11 +282,11 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
 
     let countdownText = '';
     if (days > 0) {
-      countdownText = `${days}d ${hours}h ${minutes}m`;
+      countdownText = ` in ${days}d ${hours}h ${minutes}m`;
     } else if (hours > 0) {
-      countdownText = `${hours}h ${minutes}m`;
+      countdownText = ` in ${hours}h ${minutes}m`;
     } else {
-      countdownText = `${minutes}m`;
+      countdownText = ` in ${minutes}m`;
     }
 
     countdownEl.textContent = countdownText;
