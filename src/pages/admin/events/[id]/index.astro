@@ -73,6 +73,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         image_url: formData.get('flyer_url') || null,
         flyer_url: formData.get('flyer_url') || null,
         hover_color: formData.get('hover_color') || null,
+        door_only_mode: formData.get('door_only_mode') === 'on',
         status: formData.get('status'),
         updated_at: new Date().toISOString(),
       })
@@ -485,7 +486,8 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
         <div class="form-group">
           <label for="venue_link" class="form-label">Venue Link</label>
-          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} />
+          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} placeholder="https://maps.google.com/..." />
+          <p class="form-hint">Google Maps URL for venue location</p>
         </div>
 
         <div class="form-row">
@@ -505,10 +507,37 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
               <option value="#f20519" selected={event.hover_color === '#f20519'}>Red</option>
               <option value="#f2b705" selected={event.hover_color === '#f2b705'}>Yellow</option>
               <option value="#1bf59f" selected={event.hover_color === '#1bf59f'}>Green</option>
+              <option value="#3a5cb9" selected={event.hover_color === '#3a5cb9'}>Blue</option>
             </select>
             <p class="form-hint">Color shown on hover in the event grid</p>
           </div>
         </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="door_only_mode" checked={event.door_only_mode} />
+            <span>Door Sales Mode</span>
+          </label>
+          <p class="form-hint">Enable QR code for simplified mobile checkout at the door</p>
+        </div>
+
+        {event.door_only_mode && (
+          <div class="door-qr-section">
+            <div class="qr-preview">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${Astro.url.origin}/door/${event.id}`)}`}
+                alt="Door checkout QR code"
+                width="200"
+                height="200"
+              />
+            </div>
+            <div class="qr-actions">
+              <a href={`/admin/events/${event.id}/qr`} class="btn-sm" target="_blank">Open Full Screen</a>
+              <button type="button" class="btn-sm secondary" id="copy-url-btn">Copy URL</button>
+            </div>
+            <code class="qr-url text-xs text-muted" id="door-url">{`${Astro.url.origin}/door/${event.id}`}</code>
+          </div>
+        )}
 
         <div class="form-actions">
           <a href="/admin/events" class="secondary">Back to Events</a>
@@ -843,6 +872,49 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   .add-dj-status.error {
     color: #c5221f;
   }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+  }
+
+  .door-qr-section {
+    margin-top: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    text-align: center;
+  }
+
+  .qr-preview {
+    margin-bottom: var(--space-md);
+  }
+
+  .qr-preview img {
+    display: block;
+    margin: 0 auto;
+    background: white;
+    padding: var(--space-sm);
+  }
+
+  .qr-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    margin-bottom: var(--space-sm);
+  }
+
+  .qr-url {
+    display: block;
+    word-break: break-all;
+  }
 </style>
 
 <script>
@@ -975,4 +1047,23 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
       }
     });
   });
+
+  // Copy door URL to clipboard
+  const copyUrlBtn = document.getElementById('copy-url-btn');
+  const doorUrl = document.getElementById('door-url');
+
+  if (copyUrlBtn && doorUrl) {
+    copyUrlBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(doorUrl.textContent || '');
+        const originalText = copyUrlBtn.textContent;
+        copyUrlBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyUrlBtn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+  }
 </script>

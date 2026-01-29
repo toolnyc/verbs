@@ -1,14 +1,26 @@
 ---
-import type { Event } from '../../lib/supabase';
+import type { Event, TicketTier } from '../../lib/supabase';
 
 interface Props {
   events: Event[];
   isAuthenticated?: boolean;
   featuredEventId?: string | null;
   nextEventDate?: string | null;
+  featuredTier?: TicketTier | null;
 }
 
-const { events, isAuthenticated = false, featuredEventId = null, nextEventDate = null } = Astro.props;
+const { events, isAuthenticated = false, featuredEventId = null, nextEventDate = null, featuredTier = null } = Astro.props;
+
+// Format price for featured tier button
+const featuredPrice = featuredTier ? new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+}).format(featuredTier.price) : null;
+
+// Calculate available stock for featured tier
+const featuredAvailable = featuredTier && featuredTier.max_stock !== null
+  ? featuredTier.max_stock - featuredTier.sold_count
+  : null;
 ---
 
 <div class="verb-grid" data-next-event={nextEventDate || ''}>
@@ -20,29 +32,61 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
     const isClickable = isPublished || (isDraft && isAuthenticated);
 
     return isClickable ? (
-      <a
-        href={`/events/${event.id}`}
-        class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}
-        data-hover-color={event.hover_color || ''}
-      >
-        <div class="hover-bg"></div>
-        <span class="verb-title">{event.title}</span>
-        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
-        {isDraft && <span class="draft-badge">Draft</span>}
-        {(event.flyer_url || event.image_url) && (
-          <div class="flyer-preview">
-            <img src={event.flyer_url || event.image_url} alt={event.title} />
-          </div>
+      <div class={`verb-item-wrapper ${isFeatured ? 'featured' : ''}`}>
+        <a
+          href={`/events/${event.id}`}
+          class={`verb-item clickable ${isDraft ? 'draft' : ''} ${isFeatured ? 'featured' : ''}`}
+          data-hover-color={event.hover_color || ''}
+        >
+          <div class="hover-bg"></div>
+          <span class="verb-title">
+            {event.title}
+            {isFeatured && <span class="featured-countdown" id="featured-countdown"> in --</span>}
+          </span>
+          {isDraft && <span class="draft-badge">Draft</span>}
+          {(event.flyer_url || event.image_url) && (
+            <div class="flyer-preview">
+              <img src={event.flyer_url || event.image_url} alt={event.title} />
+            </div>
+          )}
+        </a>
+        {isFeatured && featuredTier && (
+          <button
+            class="buy-btn featured-buy-btn"
+            data-event-id={event.id}
+            data-tier-id={featuredTier.id}
+            data-tier-name={featuredTier.name}
+            data-price={featuredTier.price}
+            data-available={featuredAvailable}
+          >
+            Buy {featuredPrice}
+          </button>
         )}
-      </a>
+      </div>
     ) : (
-      <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
-        <span class="verb-title">{event.title}</span>
-        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
-        {(event.flyer_url || event.image_url) && (
-          <div class="flyer-preview">
-            <img src={event.flyer_url || event.image_url} alt={event.title} />
-          </div>
+      <div class={`verb-item-wrapper ${isFeatured ? 'featured' : ''}`}>
+        <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
+          <span class="verb-title">
+            {event.title}
+            {isFeatured && <span class="featured-countdown" id="featured-countdown"> in --</span>}
+          </span>
+          {(event.flyer_url || event.image_url) && (
+            <div class="flyer-preview">
+              <img src={event.flyer_url || event.image_url} alt={event.title} />
+            </div>
+          )}
+        </div>
+        {isFeatured && featuredTier && (
+          <button
+            class="buy-btn featured-buy-btn"
+            data-event-id={event.id}
+            data-tier-id={featuredTier.id}
+            data-tier-name={featuredTier.name}
+            data-price={featuredTier.price}
+            data-available={featuredAvailable}
+          >
+            Buy {featuredPrice}
+          </button>
         )}
       </div>
     );
@@ -50,6 +94,19 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
 </div>
 
 <style>
+  /* Wrapper for featured items with buy button */
+  .verb-item-wrapper {
+    display: contents;
+  }
+
+  .verb-item-wrapper.featured {
+    display: flex;
+  }
+
+  .verb-item-wrapper.featured .verb-item {
+    flex: 1;
+  }
+
   .verb-item.draft {
     position: relative;
   }
@@ -85,19 +142,35 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
     z-index: 2;
   }
 
-  /* Featured countdown indicator */
+  /* Featured countdown indicator - inline with title */
   .featured-countdown {
-    position: relative;
-    z-index: 1;
-    display: block;
-    font-size: var(--text-sm);
+    display: inline;
+    font-size: var(--text-base);
+    font-weight: 400;
     opacity: 0.6;
     font-variant-numeric: tabular-nums;
-    margin-top: var(--space-xs);
   }
 
-  .verb-item.featured .featured-countdown {
-    font-size: var(--text-base);
+  /* Featured buy button - right aligned, full height, prominent */
+  .featured-buy-btn {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-3xl);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--color-green);
+    border: none;
+    color: var(--color-fg);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .featured-buy-btn:hover {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-bg);
   }
 </style>
 
@@ -201,7 +274,7 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
     }
 
     if (diff <= 0) {
-      countdownEl.textContent = 'Happening now';
+      countdownEl.textContent = ' now';
       return;
     }
 
@@ -211,11 +284,11 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
 
     let countdownText = '';
     if (days > 0) {
-      countdownText = `${days}d ${hours}h ${minutes}m`;
+      countdownText = ` in ${days}d ${hours}h ${minutes}m`;
     } else if (hours > 0) {
-      countdownText = `${hours}h ${minutes}m`;
+      countdownText = ` in ${hours}h ${minutes}m`;
     } else {
-      countdownText = `${minutes}m`;
+      countdownText = ` in ${minutes}m`;
     }
 
     countdownEl.textContent = countdownText;

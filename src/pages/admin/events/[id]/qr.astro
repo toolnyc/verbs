@@ -1,0 +1,112 @@
+---
+import { supabaseAdmin } from '../../../../lib/supabase';
+
+const { id } = Astro.params;
+
+if (!supabaseAdmin || !id) {
+  return Astro.redirect('/admin/events');
+}
+
+const { data: event } = await supabaseAdmin
+  .from('events')
+  .select('id, title, door_only_mode')
+  .eq('id', id)
+  .single();
+
+if (!event || !event.door_only_mode) {
+  return Astro.redirect(`/admin/events/${id}`);
+}
+
+const doorUrl = `${Astro.url.origin}/door/${event.id}`;
+const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(doorUrl)}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Door QR - {event.title}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+        padding: 2rem;
+      }
+
+      .qr-container {
+        text-align: center;
+      }
+
+      .event-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #0d0d0d;
+      }
+
+      .scan-text {
+        font-size: 1.25rem;
+        color: #666;
+        margin-bottom: 2rem;
+      }
+
+      .qr-code {
+        background: #fff;
+        padding: 1rem;
+        border: 4px solid #0d0d0d;
+        display: inline-block;
+      }
+
+      .qr-code img {
+        display: block;
+      }
+
+      .back-link {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        font-size: 0.875rem;
+        color: #666;
+        text-decoration: none;
+      }
+
+      .back-link:hover {
+        color: #0d0d0d;
+      }
+
+      @media (max-width: 480px) {
+        .event-title {
+          font-size: 1.5rem;
+        }
+
+        .qr-code img {
+          width: 280px;
+          height: 280px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href={`/admin/events/${event.id}`} class="back-link">&larr; Back to event</a>
+
+    <div class="qr-container">
+      <h1 class="event-title">{event.title}</h1>
+      <p class="scan-text">Scan to purchase tickets</p>
+      <div class="qr-code">
+        <img src={qrUrl} alt="Door checkout QR code" width="400" height="400" />
+      </div>
+    </div>
+  </body>
+</html>

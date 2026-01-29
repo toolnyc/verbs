@@ -36,6 +36,7 @@ export interface Event {
   image_url: string | null;
   flyer_url: string | null;
   hover_color: string | null;
+  door_only_mode: boolean;
   status: 'draft' | 'published' | 'archived';
   created_at: string;
   updated_at: string;
@@ -120,6 +121,32 @@ export interface NewsletterCampaign {
   failed_count: number;
   sent_at: string | null;
   created_at: string;
+}
+
+export interface SiteContent {
+  id: string;
+  content_key: string;
+  title: string;
+  content: string;
+  content_group: 'house_rules' | 'legal';
+  sort_order: number;
+  updated_at: string;
+}
+
+// Helper to get site content by group
+export async function getSiteContentByGroup(group: 'house_rules' | 'legal') {
+  const { data, error } = await supabase
+    .from('site_content')
+    .select('*')
+    .eq('content_group', group)
+    .order('sort_order');
+
+  if (error) {
+    console.error('Error fetching site content:', error);
+    return [];
+  }
+
+  return data as SiteContent[];
 }
 
 // Helper to get event with ticket tiers and DJs

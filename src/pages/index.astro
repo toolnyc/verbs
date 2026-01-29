@@ -2,7 +2,9 @@
 import Base from '../layouts/Base.astro';
 import VerbGrid from '../components/public/VerbGrid.astro';
 import Footer from '../components/public/Footer.astro';
+import HouseRulesModal from '../components/public/HouseRulesModal.astro';
 import { getAllEvents, getPublishedEvents } from '../lib/supabase';
+import type { TicketTier } from '../lib/supabase';
 import { listFlyers } from '../lib/blob';
 
 // Check if user is authenticated
@@ -31,13 +33,24 @@ const upcomingEvents = events
 const nextEventId = upcomingEvents.length > 0 ? upcomingEvents[0].id : null;
 const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
 
+// Find the cheapest available online tier for the featured event
+let featuredTier: TicketTier | null = null;
+if (upcomingEvents.length > 0 && upcomingEvents[0].ticket_tiers) {
+  const onlineTiers = (upcomingEvents[0].ticket_tiers as TicketTier[])
+    .filter(t => t.tier_type === 'online' && t.is_active)
+    .filter(t => t.max_stock === null || t.sold_count < t.max_stock) // Has stock
+    .sort((a, b) => a.price - b.price);
+  featuredTier = onlineTiers.length > 0 ? onlineTiers[0] : null;
+}
+
 ---
 
 <Base title="VERBS" description="Events and mixes from VERBS collective">
   <main>
-    <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} nextEventDate={nextEventDate} />
+    <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} nextEventDate={nextEventDate} featuredTier={featuredTier} />
   </main>
   <Footer nextEventDate={nextEventDate} />
+  {featuredTier && <HouseRulesModal />}
 </Base>
 
 <style>

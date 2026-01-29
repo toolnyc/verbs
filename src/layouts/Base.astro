@@ -38,14 +38,10 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <title>{title}</title>
   </head>
   <body>
-    <!-- SVG noise filter for texture overlay -->
-    <svg class="noise-filter" aria-hidden="true">
-      <filter id="noise">
-        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" />
-      </filter>
-    </svg>
-    <div class="noise-overlay" aria-hidden="true"></div>
+    <!-- Retro camera lens blur effect -->
+    <div class="lens-blur" aria-hidden="true"></div>
+    <!-- Canvas noise overlay -->
+    <canvas id="noise-canvas" class="noise-overlay" aria-hidden="true"></canvas>
 
     <!-- MVP: Mix functionality gated - uncomment to re-enable -->
     <!-- <PersistentPlayer mixes={mixes} /> -->
@@ -54,28 +50,108 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
 </html>
 
 <style is:global>
-  /* Noise texture overlay - subtle inkbleed effect */
-  .noise-filter {
-    position: absolute;
-    width: 0;
-    height: 0;
-  }
-
+  /* Canvas noise texture overlay */
   .noise-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.035;
-    mix-blend-mode: multiply;
-    filter: url(#noise);
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
   }
 
-  /* Disable on reduced motion preference */
+  .noise-overlay.ready {
+    opacity: 0.05;
+  }
+
+  /* Subtle camera lens blur overlay */
+  .lens-blur {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    backdrop-filter: blur(0.44px);
+    -webkit-backdrop-filter: blur(0.44px);
+  }
+
+  /* Disable effects on reduced motion preference */
   @media (prefers-reduced-motion: reduce) {
-    .noise-overlay {
+    .noise-overlay,
+    .lens-blur {
       display: none;
     }
   }
 </style>
+
+<script>
+  declare global {
+    interface Window {
+      _noiseInterval?: number;
+    }
+  }
+
+  function initNoise() {
+    const canvas = document.getElementById('noise-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    // Clear any existing interval
+    if (window._noiseInterval) {
+      clearInterval(window._noiseInterval);
+    }
+
+    // Remove ready class to reset state
+    canvas.classList.remove('ready');
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size to viewport
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Generate noise frame
+    function generateNoise() {
+      const imageData = ctx.createImageData(canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const value = Math.random() * 255;
+        data[i] = value;     // R
+        data[i + 1] = value; // G
+        data[i + 2] = value; // B
+        data[i + 3] = 255;   // A
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // Use setInterval instead of rAF to prevent pausing on click
+    generateNoise();
+    window._noiseInterval = window.setInterval(generateNoise, 50); // ~20fps
+
+    // Fade in after page content is ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        canvas.classList.add('ready');
+      });
+    });
+
+    // Cleanup on page transition
+    document.addEventListener('astro:before-preparation', () => {
+      if (window._noiseInterval) {
+        clearInterval(window._noiseInterval);
+      }
+    }, { once: true });
+  }
+
+  // Initialize on load
+  initNoise();
+
+  // Re-initialize after Astro view transitions
+  document.addEventListener('astro:page-load', initNoise);
+</script>
 

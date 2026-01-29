@@ -1,0 +1,198 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+import type { SiteContent } from '../../../lib/supabase';
+
+const { id } = Astro.params;
+
+let content: SiteContent | null = null;
+let error = '';
+let success = '';
+
+if (supabaseAdmin && id) {
+  const { data } = await supabaseAdmin
+    .from('site_content')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (!data) {
+    return Astro.redirect('/admin/content');
+  }
+
+  content = data;
+}
+
+// Handle form submissions
+if (Astro.request.method === 'POST' && supabaseAdmin && id) {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'update') {
+    const { error: updateError } = await supabaseAdmin
+      .from('site_content')
+      .update({
+        title: formData.get('title'),
+        content: formData.get('content'),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      error = updateError.message;
+    } else {
+      success = 'Content updated';
+      // Refresh data
+      const { data } = await supabaseAdmin
+        .from('site_content')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (data) content = data;
+    }
+  }
+}
+
+const groupLabel = content?.content_group === 'house_rules' ? 'House Rules' : 'Legal';
+---
+
+<Admin title={`Edit: ${content?.title || 'Content'}`}>
+  {error && <p class="error-message mb-lg">{error}</p>}
+  {success && <p class="success-message mb-lg">{success}</p>}
+
+  {content && (
+    <form method="POST" class="admin-form">
+      <input type="hidden" name="action" value="update" />
+
+      <div class="form-meta text-sm text-muted mb-lg">
+        <span class="meta-badge">{groupLabel}</span>
+        <span class="meta-key">{content.content_key}</span>
+      </div>
+
+      <div class="form-group">
+        <label for="title" class="form-label">Title *</label>
+        <input type="text" id="title" name="title" value={content.title} required />
+      </div>
+
+      <div class="form-group">
+        <label for="content" class="form-label">Content (HTML) *</label>
+        <textarea
+          id="content"
+          name="content"
+          rows="15"
+          required
+          class="content-textarea"
+        >{content.content}</textarea>
+        <p class="form-hint">
+          You can use HTML tags like &lt;ul&gt;, &lt;li&gt;, &lt;p&gt;, &lt;h3&gt;, etc.
+        </p>
+      </div>
+
+      <div class="preview-section">
+        <h3 class="preview-title text-sm text-muted mb-sm">Preview</h3>
+        <div class="preview-content" id="preview">
+          <Fragment set:html={content.content} />
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a href="/admin/content" class="secondary">Back to Content</a>
+        <button type="submit">Save Changes</button>
+      </div>
+    </form>
+  )}
+</Admin>
+
+<style>
+  .form-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .meta-badge {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-xs);
+  }
+
+  .meta-key {
+    font-family: monospace;
+  }
+
+  .content-textarea {
+    font-family: monospace;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .preview-section {
+    margin-top: var(--space-xl);
+    padding: var(--space-lg);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+  }
+
+  .preview-title {
+    font-weight: 500;
+  }
+
+  .preview-content {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+  }
+
+  .preview-content :global(ul) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .preview-content :global(li) {
+    padding: var(--space-sm) 0;
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .preview-content :global(li)::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--color-muted);
+  }
+
+  .preview-content :global(h3) {
+    font-size: var(--text-base);
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-sm);
+  }
+
+  .preview-content :global(p) {
+    margin-bottom: var(--space-md);
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  .success-message {
+    background: #e6f4ea;
+    color: #137333;
+    padding: var(--space-md);
+  }
+</style>
+
+<script>
+  // Live preview update
+  const textarea = document.getElementById('content') as HTMLTextAreaElement;
+  const preview = document.getElementById('preview');
+
+  if (textarea && preview) {
+    textarea.addEventListener('input', () => {
+      preview.innerHTML = textarea.value;
+    });
+  }
+</script>
