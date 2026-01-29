@@ -54,7 +54,12 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     inset: 0;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.12;
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
+  }
+
+  .noise-overlay.ready {
+    opacity: 0.08;
   }
 
   /* Disable on reduced motion preference */
@@ -69,6 +74,9 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
   function initNoise() {
     const canvas = document.getElementById('noise-canvas') as HTMLCanvasElement;
     if (!canvas) return;
+
+    // Remove ready class to reset state
+    canvas.classList.remove('ready');
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -97,7 +105,7 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
       ctx.putImageData(imageData, 0, 0);
     }
 
-    // Animate at ~24fps for visible movement
+    // Animate noise
     let animationId: number;
     function animate() {
       generateNoise();
@@ -106,6 +114,13 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
 
     // Start animation
     animate();
+
+    // Fade in after page content is ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        canvas.classList.add('ready');
+      });
+    });
 
     // Cleanup on page transition
     document.addEventListener('astro:before-preparation', () => {
