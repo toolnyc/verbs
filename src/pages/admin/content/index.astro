@@ -1,0 +1,188 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { supabaseAdmin } from '../../../lib/supabase';
+import type { SiteContent } from '../../../lib/supabase';
+
+let content: SiteContent[] = [];
+let error = '';
+
+if (supabaseAdmin) {
+  const { data, error: fetchError } = await supabaseAdmin
+    .from('site_content')
+    .select('*')
+    .order('content_group')
+    .order('sort_order');
+
+  if (fetchError) {
+    error = fetchError.message;
+  } else {
+    content = data || [];
+  }
+}
+
+// Group content by content_group
+const houseRules = content.filter(c => c.content_group === 'house_rules');
+const legal = content.filter(c => c.content_group === 'legal');
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+---
+
+<Admin title="Content">
+  {error && <p class="error-message mb-lg">{error}</p>}
+
+  <p class="page-description text-muted mb-xl">
+    Manage house rules shown during ticket purchase and legal pages content.
+  </p>
+
+  <section class="content-section">
+    <h2 class="section-title">House Rules</h2>
+    <p class="section-description text-muted text-sm mb-md">
+      Displayed in the modal when purchasing tickets.
+    </p>
+
+    {houseRules.length > 0 ? (
+      <div class="content-list">
+        {houseRules.map(item => (
+          <div class="content-row">
+            <div class="content-info">
+              <h3 class="content-title">
+                <a href={`/admin/content/${item.id}`}>{item.title}</a>
+              </h3>
+              <span class="content-key text-sm text-muted">{item.content_key}</span>
+            </div>
+            <div class="content-meta text-sm text-muted">
+              Updated {formatDate(item.updated_at)}
+            </div>
+            <div class="content-actions">
+              <a href={`/admin/content/${item.id}`} class="btn-sm secondary">Edit</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p class="text-muted">No house rules content yet. Run the database migration to seed initial content.</p>
+      </div>
+    )}
+  </section>
+
+  <section class="content-section">
+    <h2 class="section-title">Legal Pages</h2>
+    <p class="section-description text-muted text-sm mb-md">
+      Displayed on the /legal page.
+    </p>
+
+    {legal.length > 0 ? (
+      <div class="content-list">
+        {legal.map(item => (
+          <div class="content-row">
+            <div class="content-info">
+              <h3 class="content-title">
+                <a href={`/admin/content/${item.id}`}>{item.title}</a>
+              </h3>
+              <span class="content-key text-sm text-muted">{item.content_key}</span>
+            </div>
+            <div class="content-meta text-sm text-muted">
+              Updated {formatDate(item.updated_at)}
+            </div>
+            <div class="content-actions">
+              <a href={`/admin/content/${item.id}`} class="btn-sm secondary">Edit</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p class="text-muted">No legal content yet. Run the database migration to seed initial content.</p>
+      </div>
+    )}
+  </section>
+</Admin>
+
+<style>
+  .page-description {
+    max-width: 50ch;
+  }
+
+  .content-section {
+    margin-bottom: var(--space-3xl);
+  }
+
+  .section-title {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+  }
+
+  .content-list {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg);
+  }
+
+  .content-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: var(--space-lg);
+    align-items: center;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .content-row:last-child {
+    border-bottom: none;
+  }
+
+  .content-title {
+    font-size: var(--text-base);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+  }
+
+  .content-title a {
+    text-decoration: none;
+  }
+
+  .content-title a::after {
+    display: none;
+  }
+
+  .content-title a:hover {
+    text-decoration: underline;
+  }
+
+  .content-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .empty-state {
+    background: var(--color-bg);
+    padding: var(--space-2xl);
+    text-align: center;
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  @media (max-width: 768px) {
+    .content-row {
+      grid-template-columns: 1fr;
+      gap: var(--space-sm);
+    }
+
+    .content-meta,
+    .content-actions {
+      justify-self: start;
+    }
+  }
+</style>

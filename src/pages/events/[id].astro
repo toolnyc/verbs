@@ -69,7 +69,7 @@ const nextEventDate = !isPast ? event.date : null;
     <a href="/" class="back-link no-underline">Back</a>
 
     <div class="event-layout">
-      <div class="event-image-wrapper img-hover-reveal">
+      <div class="event-image-wrapper">
         {(event.flyer_url || event.image_url) && (
           <img src={event.flyer_url || event.image_url} alt={event.title} class="event-image" />
         )}

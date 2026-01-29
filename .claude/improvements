@@ -1,35 +1,16 @@
-Feature Improvements
-1. Need to include house rules agreement (see copy below) in order to begin a checkout session
-2. Need to create a checkout success page
-  2a. Need to investigate why stock is not decrementing and orders are not being logged in the
-  database
+Please handle the following improvements in the order most efficient and least error prone.
+
+UX
+- Need to add the party countdown timer or other visual indication of upcoming party to the clickable link (need to be apparent that the largest verb is in fact the upcoming party)
+- Admin dashboard seems to force reload on adding new DJ's and if there are pending changes to other bits of text, those are nuked; would love to avoid this behavior if possible
 
 
 
+Design
+- Would love to add some sort of inkbleed noise or overlay texture that can distress the site a bit without degrading performance or UX (not on admin site tho)
+- If easy, would like to add hover color selection for each event in the admin dashboard (i.e. can pick from a brand color so long as it's not white/meets accessibility standards)
+- The bottom navbar only has the spinning component of the logo but should have the "non-spin component" sit directly behind it. Ask questions about this implementation if you do not understand. These are meant to fit togther like puzzle pieces. 
+- Remove bits of low-opacity or low-saturation brand blue as background. This seems present in the admin dashboard most frequently. Backgrounds should be exculusively brand white unless otherwise specified. 
 
-photography
--
-be present - please keep phone use off the dance floor. a sticker will be placed on your phone cameras upon entry.
--
-no professional cameras
--
-please respect this policy as you'll be respecting the space and people around you
--
-this policy is required for entry
-disclaimers
--
-MINIMUM AGE FOR ENTRY IS 21
--
-OUTSIDE FOOD AND OR ALCOHOL IS PROHIBITED UPON ENTRY
--
-VERBS IS NOT RESPONSIBLE FOR LOST OR STOLEN GOODS
--
-VERBS DOES NOT BEAR RESPONSIBILITY FOR ANY INJURY OR MEDICAL ISSUES SUFFERED ONSITE. HOWEVER, IF NECESSARY, WE ARE OBLIGED TO CALL FIRST RESPONDERS. PLEASE NOTE THAT ANY EXPENSES INCURRED FOR MEDICAL ASSISTANCE WILL BE THE RESPONSIBILITY OF THE INDIVIDUAL IN NEED OF CARE.
--
-IF YOU LOST SOMETHING PLEASE EMAIL INFO@VERBS-MIA.COM, WE’LL COME BACK TO YOU AFTER THE EVENT TAKES PLACE AND IF IT HAS BEEN FOUND
--
-OPEN USE OF, POSSESSION OR TRADE OF ILLEGAL SUBSTANCES IS PROHIBITED AND WILL RESULT IN IMMEDIATE REMOVAL FROM THE PREMISE
--
-POSSESSION OR TRADE OF WEAPONS IS PROHIBITED. YOU WILL BE SEARCHED AT THE DOOR. IF YOU DO NOT AGREE TO THIS, YOU WILL BE DENYED ENTRY
--
-SAFETY, WELL-BEING, AND INCLUSIVITY IS A PRIORITY. WE HAVE A ZERO- TOLERANCE POLICY TOWARDS AGGRESSION, DISCRIMINATION, HARASSMENT, OR ANY FORM OF VIOLENCE. THIS MEANS NO RACISM, QUEER-PHOBIA, BULLYING, SEXUAL MISCONDUCT, ANTI-SEMITISM, ETC. WE ENCOURAGE YOU TO REPOST ANY CONCERNS TO OUR SECURITY OR MEMBERS BEHIND THE BAR
+Functionality
+-Post purchase sends me to a non-existent success page. Please re-direct to a success specific page that can receive props from the purchased event and display a downloadable or saveable confirmation page with an order number or something that would be searchable on admin side. If easy to implement a QR code generator would be awesome or something.  Actually now that I mention it let's add a section to the admin side that allows admins to view list of attendees for a certain event & bypass payment / add to guestlist.

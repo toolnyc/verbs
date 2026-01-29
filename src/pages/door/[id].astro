@@ -1,0 +1,321 @@
+---
+import Base from '../../layouts/Base.astro';
+import { supabase } from '../../lib/supabase';
+import type { Event, TicketTier } from '../../lib/supabase';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/');
+}
+
+// Fetch event
+const { data: event } = await supabase
+  .from('events')
+  .select('*')
+  .eq('id', id)
+  .eq('status', 'published')
+  .single();
+
+// Must be published and have door_only_mode enabled
+if (!event || !event.door_only_mode) {
+  return Astro.redirect('/');
+}
+
+// Find the door tier (or cheapest online tier if no door tier)
+const { data: tiers } = await supabase
+  .from('ticket_tiers')
+  .select('*')
+  .eq('event_id', id)
+  .eq('is_active', true)
+  .order('price');
+
+// Prefer door tier, fall back to cheapest tier
+let tier: TicketTier | null = null;
+if (tiers && tiers.length > 0) {
+  tier = tiers.find(t => t.tier_type === 'door') || tiers[0];
+}
+
+if (!tier) {
+  return Astro.redirect('/');
+}
+
+const formattedPrice = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+}).format(tier.price);
+
+const available = tier.max_stock !== null ? tier.max_stock - tier.sold_count : null;
+const isSoldOut = available !== null && available <= 0;
+---
+
+<Base title={`${event.title} - Door Checkout`} description={`Purchase tickets for ${event.title}`}>
+  <main class="door-checkout">
+    <div class="checkout-card">
+      <h1 class="event-title">{event.title}</h1>
+      <p class="event-venue text-muted">{event.venue_name}</p>
+
+      {isSoldOut ? (
+        <div class="sold-out-message">
+          <p>Sorry, tickets are sold out.</p>
+        </div>
+      ) : (
+        <form id="door-checkout-form" class="checkout-form">
+          <input type="hidden" name="event_id" value={event.id} />
+          <input type="hidden" name="tier_id" value={tier.id} />
+
+          <div class="ticket-row">
+            <div class="ticket-info">
+              <span class="ticket-name">{tier.name}</span>
+              <span class="ticket-price">{formattedPrice}</span>
+            </div>
+          </div>
+
+          <div class="quantity-section">
+            <label class="quantity-label">Quantity</label>
+            <div class="quantity-controls">
+              <button type="button" class="qty-btn" id="qty-decrease" disabled>-</button>
+              <span class="qty-value" id="qty-value">1</span>
+              <button type="button" class="qty-btn" id="qty-increase">+</button>
+            </div>
+          </div>
+
+          <div class="total-section">
+            <span class="total-label">Total</span>
+            <span class="total-value" id="total-value">{formattedPrice}</span>
+          </div>
+
+          <button type="submit" class="pay-btn" id="pay-btn">
+            Pay {formattedPrice}
+          </button>
+
+          <p class="terms-note text-xs text-muted">
+            By purchasing, you agree to our house rules and terms of service.
+          </p>
+        </form>
+      )}
+    </div>
+  </main>
+</Base>
+
+<style>
+  .door-checkout {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+  }
+
+  .checkout-card {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--space-xl);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+  }
+
+  .event-title {
+    font-size: var(--text-3xl);
+    margin-bottom: var(--space-xs);
+  }
+
+  .event-venue {
+    margin-bottom: var(--space-xl);
+  }
+
+  .checkout-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .ticket-row {
+    padding: var(--space-md);
+    background: var(--color-bg-alt);
+  }
+
+  .ticket-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ticket-name {
+    font-weight: 500;
+  }
+
+  .ticket-price {
+    font-weight: 500;
+  }
+
+  .quantity-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .quantity-label {
+    font-weight: 500;
+  }
+
+  .quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .qty-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-xl);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .qty-btn:hover:not(:disabled) {
+    border-color: var(--color-fg);
+  }
+
+  .qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .qty-value {
+    min-width: 44px;
+    text-align: center;
+    font-size: var(--text-xl);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .total-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .total-label {
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
+
+  .total-value {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+  }
+
+  .pay-btn {
+    width: 100%;
+    padding: var(--space-lg);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    background: var(--color-green);
+    border: none;
+    color: var(--color-fg);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .pay-btn:hover:not(:disabled) {
+    background: var(--color-fg);
+    color: var(--color-bg);
+  }
+
+  .pay-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .terms-note {
+    text-align: center;
+  }
+
+  .sold-out-message {
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--color-muted);
+  }
+</style>
+
+<script define:vars={{ price: tier.price, available, maxPerPurchase: 10 }}>
+  const form = document.getElementById('door-checkout-form');
+  const decreaseBtn = document.getElementById('qty-decrease');
+  const increaseBtn = document.getElementById('qty-increase');
+  const qtyValue = document.getElementById('qty-value');
+  const totalValue = document.getElementById('total-value');
+  const payBtn = document.getElementById('pay-btn');
+
+  let quantity = 1;
+  const maxQuantity = available !== null ? Math.min(maxPerPurchase, available) : maxPerPurchase;
+
+  function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  }
+
+  function updateDisplay() {
+    qtyValue.textContent = quantity;
+    totalValue.textContent = formatCurrency(price * quantity);
+    payBtn.textContent = `Pay ${formatCurrency(price * quantity)}`;
+    decreaseBtn.disabled = quantity <= 1;
+    increaseBtn.disabled = quantity >= maxQuantity;
+  }
+
+  decreaseBtn?.addEventListener('click', () => {
+    if (quantity > 1) {
+      quantity--;
+      updateDisplay();
+    }
+  });
+
+  increaseBtn?.addEventListener('click', () => {
+    if (quantity < maxQuantity) {
+      quantity++;
+      updateDisplay();
+    }
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    payBtn.disabled = true;
+    payBtn.textContent = 'Processing...';
+
+    try {
+      const formData = new FormData(form);
+      const response = await fetch('/api/door-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: formData.get('event_id'),
+          tier_id: formData.get('tier_id'),
+          quantity: quantity,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'Checkout failed');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      payBtn.disabled = false;
+      updateDisplay();
+      alert('Something went wrong. Please try again.');
+    }
+  });
+</script>

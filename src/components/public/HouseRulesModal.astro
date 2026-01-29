@@ -1,5 +1,9 @@
 ---
 // House Rules Modal - render once per page where ticket purchase is available
+import { getSiteContentByGroup } from '../../lib/supabase';
+
+// Fetch house rules content from database
+const houseRules = await getSiteContentByGroup('house_rules');
 ---
 
 <div id="house-rules-modal" class="modal" aria-hidden="true">
@@ -26,42 +30,12 @@
 
     <h2 class="modal-title">House Rules</h2>
 
-    <div class="rules-section">
-      <h3 class="rules-heading">Photography</h3>
-      <ul class="rules-list">
-        <li>Be present &mdash; please keep phone use off the dance floor. A sticker will be placed on your phone cameras upon entry.</li>
-        <li>No professional cameras.</li>
-        <li>Please respect this policy as you'll be respecting the space and people around you.</li>
-        <li>This policy is required for entry.</li>
-      </ul>
-    </div>
-
-    <div class="rules-section">
-      <h3 class="rules-heading">Entry Requirements</h3>
-      <ul class="rules-list">
-        <li>Minimum age for entry is 21.</li>
-        <li>Outside food and alcohol is prohibited.</li>
-        <li>You will be searched at the door. If you do not agree, you will be denied entry.</li>
-      </ul>
-    </div>
-
-    <div class="rules-section">
-      <h3 class="rules-heading">Safety & Conduct</h3>
-      <ul class="rules-list">
-        <li>Safety, well-being, and inclusivity is a priority. We have a zero-tolerance policy towards aggression, discrimination, harassment, or any form of violence. This means no racism, queer-phobia, bullying, sexual misconduct, anti-semitism, etc.</li>
-        <li>Open use of, possession or trade of illegal substances is prohibited and will result in immediate removal.</li>
-        <li>Possession or trade of weapons is prohibited.</li>
-        <li>Report any concerns to our security or members behind the bar.</li>
-      </ul>
-    </div>
-
-    <div class="rules-section">
-      <h3 class="rules-heading">Liability</h3>
-      <ul class="rules-list">
-        <li>VERBS is not responsible for lost or stolen goods. If you lost something, email info@verbs-mia.com after the event.</li>
-        <li>VERBS does not bear responsibility for any injury or medical issues suffered onsite. If necessary, we will call first responders. Any expenses incurred will be the responsibility of the individual.</li>
-      </ul>
-    </div>
+    {houseRules.map(rule => (
+      <div class="rules-section">
+        <h3 class="rules-heading">{rule.title}</h3>
+        <div class="rules-content" set:html={rule.content} />
+      </div>
+    ))}
 
     <div class="modal-actions">
       <label class="agreement-label">
@@ -233,6 +207,33 @@
     color: var(--color-muted);
   }
 
+  /* Dynamic rules content from database */
+  .rules-content {
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .rules-content :global(ul) {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+  }
+
+  .rules-content :global(li) {
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .rules-content :global(li)::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--color-muted);
+  }
+
   .modal-actions {
     margin-top: var(--space-xl);
     padding-top: var(--space-lg);
@@ -279,3 +280,218 @@
     color: var(--color-bg);
   }
 </style>
+
+<script>
+  // Store pending checkout details
+  let pendingCheckout: {
+    eventId: string;
+    tierId: string;
+    tierName: string;
+    price: number;
+    maxQuantity: number;
+    quantity: number;
+  } | null = null;
+
+  function getModal() {
+    return document.getElementById('house-rules-modal');
+  }
+
+  function getCheckbox() {
+    return document.getElementById('rules-agreement') as HTMLInputElement | null;
+  }
+
+  function getProceedBtn() {
+    return document.getElementById('proceed-checkout') as HTMLButtonElement | null;
+  }
+
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  }
+
+  function updateModalDisplay() {
+    if (!pendingCheckout) return;
+
+    const tierNameEl = document.getElementById('modal-tier-name');
+    const tierPriceEl = document.getElementById('modal-tier-price');
+    const qtyValueEl = document.getElementById('qty-value');
+    const totalEl = document.getElementById('modal-total');
+    const decreaseBtn = document.getElementById('qty-decrease') as HTMLButtonElement;
+    const increaseBtn = document.getElementById('qty-increase') as HTMLButtonElement;
+
+    if (tierNameEl) tierNameEl.textContent = pendingCheckout.tierName;
+    if (tierPriceEl) tierPriceEl.textContent = `${formatCurrency(pendingCheckout.price)} each`;
+    if (qtyValueEl) qtyValueEl.textContent = String(pendingCheckout.quantity);
+    if (totalEl) totalEl.textContent = formatCurrency(pendingCheckout.price * pendingCheckout.quantity);
+
+    if (decreaseBtn) decreaseBtn.disabled = pendingCheckout.quantity <= 1;
+    if (increaseBtn) increaseBtn.disabled = pendingCheckout.quantity >= pendingCheckout.maxQuantity;
+  }
+
+  function openModal(eventId: string, tierId: string, tierName: string, price: number, available: number | null) {
+    const modal = getModal();
+    const checkbox = getCheckbox();
+    const proceedBtn = getProceedBtn();
+
+    if (!modal || !checkbox || !proceedBtn) return;
+
+    // Max 10 tickets per purchase, or available stock if lower
+    const maxQuantity = available !== null ? Math.min(10, available) : 10;
+
+    pendingCheckout = {
+      eventId,
+      tierId,
+      tierName,
+      price,
+      maxQuantity,
+      quantity: 1,
+    };
+
+    checkbox.checked = false;
+    proceedBtn.disabled = true;
+    updateModalDisplay();
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    const modal = getModal();
+    const checkbox = getCheckbox();
+
+    if (!modal) return;
+
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    pendingCheckout = null;
+    if (checkbox) checkbox.checked = false;
+  }
+
+  function changeQuantity(delta: number) {
+    if (!pendingCheckout) return;
+
+    const newQty = pendingCheckout.quantity + delta;
+    if (newQty >= 1 && newQty <= pendingCheckout.maxQuantity) {
+      pendingCheckout.quantity = newQty;
+      updateModalDisplay();
+    }
+  }
+
+  async function proceedToCheckout() {
+    if (!pendingCheckout) return;
+
+    const proceedBtn = getProceedBtn();
+    if (!proceedBtn) return;
+
+    const originalText = proceedBtn.textContent;
+    proceedBtn.disabled = true;
+    proceedBtn.textContent = 'Loading...';
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: pendingCheckout.eventId,
+          ticket_tier_id: pendingCheckout.tierId,
+          quantity: pendingCheckout.quantity,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'Checkout failed');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      proceedBtn.disabled = false;
+      proceedBtn.textContent = originalText;
+      alert('Something went wrong. Please try again.');
+    }
+  }
+
+  function handleBuyClick(e: Event) {
+    const target = e.target as HTMLElement;
+    const button = target.closest('.buy-btn') as HTMLButtonElement;
+    if (!button) return;
+
+    // Prevent link navigation when button is inside an anchor
+    e.preventDefault();
+    e.stopPropagation();
+
+    const eventId = button.dataset.eventId;
+    const tierId = button.dataset.tierId;
+    const tierName = button.dataset.tierName || 'Ticket';
+    const price = parseFloat(button.dataset.price || '0');
+    const available = button.dataset.available ? parseInt(button.dataset.available, 10) : null;
+
+    if (eventId && tierId) {
+      openModal(eventId, tierId, tierName, price, available);
+    }
+  }
+
+  function handleModalClick(e: Event) {
+    const target = e.target as HTMLElement;
+
+    // Close on backdrop click
+    if (target.classList.contains('modal-backdrop')) {
+      closeModal();
+      return;
+    }
+
+    // Close on cancel button
+    if (target.hasAttribute('data-close-modal')) {
+      closeModal();
+      return;
+    }
+
+    // Quantity controls
+    if (target.id === 'qty-decrease') {
+      changeQuantity(-1);
+      return;
+    }
+
+    if (target.id === 'qty-increase') {
+      changeQuantity(1);
+      return;
+    }
+
+    // Proceed to checkout
+    if (target.id === 'proceed-checkout' && !target.hasAttribute('disabled')) {
+      proceedToCheckout();
+      return;
+    }
+  }
+
+  function handleCheckboxChange(e: Event) {
+    const checkbox = e.target as HTMLInputElement;
+    if (checkbox.id !== 'rules-agreement') return;
+
+    const proceedBtn = getProceedBtn();
+    if (proceedBtn) {
+      proceedBtn.disabled = !checkbox.checked;
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      const modal = getModal();
+      if (modal?.getAttribute('aria-hidden') === 'false') {
+        closeModal();
+      }
+    }
+  }
+
+  // Only add listeners once using a flag on document
+  if (!(document as any).__houseRulesModalListenerAdded) {
+    document.addEventListener('click', handleBuyClick);
+    document.addEventListener('click', handleModalClick);
+    document.addEventListener('change', handleCheckboxChange);
+    document.addEventListener('keydown', handleKeydown);
+    (document as any).__houseRulesModalListenerAdded = true;
+  }
+</script>

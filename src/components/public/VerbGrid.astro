@@ -1,14 +1,26 @@
 ---
-import type { Event } from '../../lib/supabase';
+import type { Event, TicketTier } from '../../lib/supabase';
 
 interface Props {
   events: Event[];
   isAuthenticated?: boolean;
   featuredEventId?: string | null;
   nextEventDate?: string | null;
+  featuredTier?: TicketTier | null;
 }
 
-const { events, isAuthenticated = false, featuredEventId = null, nextEventDate = null } = Astro.props;
+const { events, isAuthenticated = false, featuredEventId = null, nextEventDate = null, featuredTier = null } = Astro.props;
+
+// Format price for featured tier button
+const featuredPrice = featuredTier ? new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+}).format(featuredTier.price) : null;
+
+// Calculate available stock for featured tier
+const featuredAvailable = featuredTier && featuredTier.max_stock !== null
+  ? featuredTier.max_stock - featuredTier.sold_count
+  : null;
 ---
 
 <div class="verb-grid" data-next-event={nextEventDate || ''}>
@@ -26,8 +38,25 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
         data-hover-color={event.hover_color || ''}
       >
         <div class="hover-bg"></div>
+        {isFeatured && <span class="upcoming-label">Upcoming</span>}
         <span class="verb-title">{event.title}</span>
-        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
+        {isFeatured && (
+          <div class="featured-cta">
+            <span class="featured-countdown" id="featured-countdown">--</span>
+            {featuredTier && (
+              <button
+                class="buy-btn featured-buy-btn"
+                data-event-id={event.id}
+                data-tier-id={featuredTier.id}
+                data-tier-name={featuredTier.name}
+                data-price={featuredTier.price}
+                data-available={featuredAvailable}
+              >
+                Buy {featuredPrice}
+              </button>
+            )}
+          </div>
+        )}
         {isDraft && <span class="draft-badge">Draft</span>}
         {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
@@ -37,8 +66,25 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
       </a>
     ) : (
       <div class={`verb-item future ${isFeatured ? 'featured' : ''}`}>
+        {isFeatured && <span class="upcoming-label">Upcoming</span>}
         <span class="verb-title">{event.title}</span>
-        {isFeatured && <span class="featured-countdown" id="featured-countdown">--</span>}
+        {isFeatured && (
+          <div class="featured-cta">
+            <span class="featured-countdown" id="featured-countdown">--</span>
+            {featuredTier && (
+              <button
+                class="buy-btn featured-buy-btn"
+                data-event-id={event.id}
+                data-tier-id={featuredTier.id}
+                data-tier-name={featuredTier.name}
+                data-price={featuredTier.price}
+                data-available={featuredAvailable}
+              >
+                Buy {featuredPrice}
+              </button>
+            )}
+          </div>
+        )}
         {(event.flyer_url || event.image_url) && (
           <div class="flyer-preview">
             <img src={event.flyer_url || event.image_url} alt={event.title} />
@@ -85,6 +131,18 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
     z-index: 2;
   }
 
+  /* Upcoming label for featured event */
+  .upcoming-label {
+    position: relative;
+    z-index: 1;
+    display: block;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+    margin-bottom: var(--space-xs);
+  }
+
   /* Featured countdown indicator */
   .featured-countdown {
     position: relative;
@@ -98,6 +156,37 @@ const { events, isAuthenticated = false, featuredEventId = null, nextEventDate =
 
   .verb-item.featured .featured-countdown {
     font-size: var(--text-base);
+  }
+
+  /* Featured CTA with countdown and buy button */
+  .featured-cta {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-top: var(--space-xs);
+  }
+
+  .featured-cta .featured-countdown {
+    margin-top: 0;
+  }
+
+  .featured-buy-btn {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    background: var(--color-green);
+    border: 1px solid var(--color-green);
+    color: var(--color-fg);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .featured-buy-btn:hover {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-bg);
   }
 </style>
 

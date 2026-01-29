@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Footer from '../components/public/Footer.astro';
-import { getPublishedEvents } from '../lib/supabase';
+import { getPublishedEvents, getSiteContentByGroup } from '../lib/supabase';
 
 // Get next event for countdown
 const events = await getPublishedEvents();
@@ -10,6 +10,9 @@ const upcomingEvents = events
   .filter(e => new Date(e.date) >= now)
   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
+
+// Get legal content from database
+const legalContent = await getSiteContentByGroup('legal');
 ---
 
 <Base title="Legal - VERBS" description="Privacy Policy and Terms of Service">
@@ -18,49 +21,12 @@ const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
 
     <h1>Legal</h1>
 
-    <section class="legal-section">
-      <h2>Privacy Policy</h2>
-      <p>Last updated: January 2025</p>
-
-      <h3>Information We Collect</h3>
-      <p>We collect information you provide directly to us, including:</p>
-      <ul>
-        <li>Email address when you subscribe to our newsletter</li>
-        <li>Name and email when you purchase tickets</li>
-        <li>Payment information processed securely through Stripe</li>
-      </ul>
-
-      <h3>How We Use Your Information</h3>
-      <p>We use the information we collect to:</p>
-      <ul>
-        <li>Send you newsletters and event updates (if subscribed)</li>
-        <li>Process ticket purchases and send order confirmations</li>
-        <li>Communicate about events you've registered for</li>
-      </ul>
-
-      <h3>Data Sharing</h3>
-      <p>We do not sell or share your personal information with third parties except as necessary to process payments (Stripe) and send emails (Resend).</p>
-
-      <h3>Contact</h3>
-      <p>For privacy-related questions, contact us at hello@verbsaroundthe.world</p>
-    </section>
-
-    <section class="legal-section">
-      <h2>Terms of Service</h2>
-      <p>Last updated: January 2025</p>
-
-      <h3>Ticket Purchases</h3>
-      <p>All ticket sales are final. Refunds may be issued at our discretion in case of event cancellation.</p>
-
-      <h3>Event Entry</h3>
-      <p>Valid ticket and ID required for entry. We reserve the right to refuse entry or remove attendees who violate venue policies.</p>
-
-      <h3>Newsletter</h3>
-      <p>You can unsubscribe from our newsletter at any time by clicking the unsubscribe link in any email.</p>
-
-      <h3>Changes</h3>
-      <p>We may update these terms from time to time. Continued use of our services constitutes acceptance of updated terms.</p>
-    </section>
+    {legalContent.map(section => (
+      <section class="legal-section">
+        <h2>{section.title}</h2>
+        <div class="legal-content" set:html={section.content} />
+      </section>
+    ))}
   </main>
   <Footer nextEventDate={nextEventDate} />
 </Base>
@@ -117,6 +83,27 @@ const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
   }
 
   .legal-section li {
+    margin-bottom: var(--space-xs);
+    line-height: 1.6;
+  }
+
+  .legal-content h3 {
+    font-size: var(--text-xl);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-sm);
+  }
+
+  .legal-content p {
+    margin-bottom: var(--space-md);
+    line-height: 1.6;
+  }
+
+  .legal-content ul {
+    margin-bottom: var(--space-md);
+    padding-left: var(--space-xl);
+  }
+
+  .legal-content li {
     margin-bottom: var(--space-xs);
     line-height: 1.6;
   }
