@@ -61,7 +61,7 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
   }
 
   .noise-overlay.ready {
-    opacity: 0.08;
+    opacity: 0.06;
   }
 
   /* Subtle camera lens blur overlay */
@@ -105,16 +105,10 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Scale factor for finer grain (higher = smaller grain)
-    const scale = 3;
-
-    // Set canvas size to viewport (scaled up for finer grain)
+    // Set canvas size to viewport
     function resize() {
-      canvas.width = window.innerWidth * scale;
-      canvas.height = window.innerHeight * scale;
-      // CSS keeps it at viewport size, so grain appears smaller
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
     resize();
     window.addEventListener('resize', resize);
