@@ -84,6 +84,12 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     opacity: 0.05;
   }
 
+  @media (max-width: 768px) {
+    .noise-overlay.ready {
+      opacity: 0.03;
+    }
+  }
+
   /* Subtle camera lens blur overlay */
   .lens-blur {
     position: fixed;
