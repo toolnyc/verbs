@@ -44,7 +44,7 @@ const houseRules = await getSiteContentByGroup('house_rules');
       </label>
       <div class="action-buttons">
         <button type="button" class="cancel-btn secondary" data-close-modal>Cancel</button>
-        <button type="button" class="proceed-btn" id="proceed-checkout" disabled>Proceed to checkout</button>
+        <button type="button" class="proceed-btn" id="proceed-checkout" disabled>I agree</button>
       </div>
     </div>
   </div>
@@ -266,6 +266,10 @@ const houseRules = await getSiteContentByGroup('house_rules');
   .proceed-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .proceed-btn {
+    white-space: nowrap;
   }
 
   .proceed-btn:not(:disabled) {
