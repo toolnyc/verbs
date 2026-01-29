@@ -38,6 +38,9 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <title>{title}</title>
   </head>
   <body>
+    <!-- Page transition overlay -->
+    <div class="page-transition" id="page-transition" aria-hidden="true"></div>
+
     <!-- Retro camera lens blur effect -->
     <div class="lens-blur" aria-hidden="true"></div>
     <!-- Canvas noise overlay -->
@@ -50,6 +53,23 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
 </html>
 
 <style is:global>
+  /* Page transition overlay - GPU accelerated */
+  .page-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: var(--color-cream);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity;
+  }
+
+  .page-transition.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
   /* Canvas noise texture overlay */
   .noise-overlay {
     position: fixed;
@@ -80,6 +100,9 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     .lens-blur {
       display: none;
     }
+    .page-transition {
+      transition: none;
+    }
   }
 </style>
 
@@ -89,6 +112,46 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
       _noiseInterval?: number;
     }
   }
+
+  // Page transition handling with Astro ViewTransitions
+  let transitionStartTime = 0;
+  const MIN_TRANSITION_TIME = 500; // 0.5s minimum total transition
+
+  function initPageTransitions() {
+    // Show overlay when navigation starts
+    document.addEventListener('astro:before-preparation', (e: any) => {
+      transitionStartTime = performance.now();
+      const transitionOverlay = document.getElementById('page-transition');
+      if (transitionOverlay) {
+        transitionOverlay.classList.add('active');
+      }
+
+      // Ensure minimum transition time before page swap
+      const originalLoader = e.loader;
+      e.loader = async () => {
+        const [result] = await Promise.all([
+          originalLoader(),
+          new Promise(resolve => setTimeout(resolve, MIN_TRANSITION_TIME / 2))
+        ]);
+        return result;
+      };
+    });
+
+    // Hide overlay after page loads
+    document.addEventListener('astro:page-load', () => {
+      const overlay = document.getElementById('page-transition');
+      if (overlay && overlay.classList.contains('active')) {
+        const elapsed = performance.now() - transitionStartTime;
+        const remaining = Math.max(0, MIN_TRANSITION_TIME - elapsed);
+
+        setTimeout(() => {
+          overlay.classList.remove('active');
+        }, remaining);
+      }
+    });
+  }
+
+  initPageTransitions();
 
   function initNoise() {
     const canvas = document.getElementById('noise-canvas') as HTMLCanvasElement;
