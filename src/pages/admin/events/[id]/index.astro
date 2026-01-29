@@ -82,6 +82,34 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     if (updateError) {
       error = updateError.message;
     } else {
+      // If door_only_mode was just enabled, ensure a door tier exists
+      const doorModeEnabled = formData.get('door_only_mode') === 'on';
+      if (doorModeEnabled) {
+        const existingDoorTier = tiers.find(t => t.tier_type === 'door');
+        if (!existingDoorTier) {
+          // Auto-create a door tier with $35 default price
+          const { error: doorTierError } = await supabaseAdmin
+            .from('ticket_tiers')
+            .insert({
+              event_id: id,
+              name: 'Door',
+              tier_type: 'door',
+              price: 35,
+              is_active: true,
+              sort_order: tiers.length,
+            });
+
+          if (doorTierError) {
+            error = `Door mode enabled but failed to create door tier: ${doorTierError.message}`;
+          } else {
+            // Refresh tiers list
+            const { data: refreshedTiers } = await supabaseAdmin
+              .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+            tiers = refreshedTiers || [];
+          }
+        }
+      }
+
       // If title changed, update all Stripe products for this event's tiers
       if (titleChanged) {
         const { data: tiersWithStripe } = await supabaseAdmin
@@ -521,23 +549,36 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           <p class="form-hint">Enable QR code for simplified mobile checkout at the door</p>
         </div>
 
-        {event.door_only_mode && (
-          <div class="door-qr-section">
-            <div class="qr-preview">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${Astro.url.origin}/door/${event.id}`)}`}
-                alt="Door checkout QR code"
-                width="200"
-                height="200"
-              />
+        {event.door_only_mode && (() => {
+          const activeTiers = tiers.filter(t => t.is_active).sort((a, b) => a.price - b.price);
+          const linkedTier = activeTiers.find(t => t.tier_type === 'door') || activeTiers[0];
+          return (
+            <div class="door-qr-section">
+              {linkedTier ? (
+                <div class="linked-tier-info">
+                  <span class="linked-tier-label">Linked to:</span>
+                  <span class="linked-tier-name">{linkedTier.name}</span>
+                  <span class="linked-tier-price">${linkedTier.price}</span>
+                </div>
+              ) : (
+                <p class="form-hint text-warning">No active tiers available for door sales</p>
+              )}
+              <div class="qr-preview">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${Astro.url.origin}/door/${event.id}`)}`}
+                  alt="Door checkout QR code"
+                  width="200"
+                  height="200"
+                />
+              </div>
+              <div class="qr-actions">
+                <a href={`/admin/events/${event.id}/qr`} class="btn-sm" target="_blank">Open Full Screen</a>
+                <button type="button" class="btn-sm secondary" id="copy-url-btn">Copy URL</button>
+              </div>
+              <code class="qr-url text-xs text-muted" id="door-url">{`${Astro.url.origin}/door/${event.id}`}</code>
             </div>
-            <div class="qr-actions">
-              <a href={`/admin/events/${event.id}/qr`} class="btn-sm" target="_blank">Open Full Screen</a>
-              <button type="button" class="btn-sm secondary" id="copy-url-btn">Copy URL</button>
-            </div>
-            <code class="qr-url text-xs text-muted" id="door-url">{`${Astro.url.origin}/door/${event.id}`}</code>
-          </div>
-        )}
+          );
+        })()}
 
         <div class="form-actions">
           <a href="/admin/events" class="secondary">Back to Events</a>
@@ -914,6 +955,34 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   .qr-url {
     display: block;
     word-break: break-all;
+  }
+
+  .linked-tier-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+  }
+
+  .linked-tier-label {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+  }
+
+  .linked-tier-name {
+    font-weight: 500;
+  }
+
+  .linked-tier-price {
+    font-weight: 700;
+  }
+
+  .text-warning {
+    color: var(--color-yellow, #f2b705);
   }
 </style>
 
