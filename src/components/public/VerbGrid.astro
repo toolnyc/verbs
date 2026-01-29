@@ -172,6 +172,19 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     border-color: var(--color-fg);
     color: var(--color-bg);
   }
+
+  /* Mobile: Stack title/countdown above buy button */
+  @media (max-width: 768px) {
+    .verb-item-wrapper.featured {
+      flex-direction: column;
+    }
+
+    .featured-buy-btn {
+      width: 100%;
+      justify-content: center;
+      padding: var(--space-lg);
+    }
+  }
 </style>
 
 <script>
