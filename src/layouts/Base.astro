@@ -38,6 +38,8 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <title>{title}</title>
   </head>
   <body>
+    <!-- Retro camera lens blur effect -->
+    <div class="lens-blur" aria-hidden="true"></div>
     <!-- Canvas noise overlay -->
     <canvas id="noise-canvas" class="noise-overlay" aria-hidden="true"></canvas>
 
@@ -62,18 +64,40 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     opacity: 0.08;
   }
 
-  /* Disable on reduced motion preference */
+  /* Subtle camera lens blur overlay */
+  .lens-blur {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    backdrop-filter: blur(0.4px);
+    -webkit-backdrop-filter: blur(0.4px);
+  }
+
+  /* Disable effects on reduced motion preference */
   @media (prefers-reduced-motion: reduce) {
-    .noise-overlay {
+    .noise-overlay,
+    .lens-blur {
       display: none;
     }
   }
 </style>
 
 <script>
+  declare global {
+    interface Window {
+      _noiseInterval?: number;
+    }
+  }
+
   function initNoise() {
     const canvas = document.getElementById('noise-canvas') as HTMLCanvasElement;
     if (!canvas) return;
+
+    // Clear any existing interval
+    if (window._noiseInterval) {
+      clearInterval(window._noiseInterval);
+    }
 
     // Remove ready class to reset state
     canvas.classList.remove('ready');
@@ -89,7 +113,7 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     resize();
     window.addEventListener('resize', resize);
 
-    // Generate and animate noise
+    // Generate noise frame
     function generateNoise() {
       const imageData = ctx.createImageData(canvas.width, canvas.height);
       const data = imageData.data;
@@ -105,15 +129,9 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
       ctx.putImageData(imageData, 0, 0);
     }
 
-    // Animate noise
-    let animationId: number;
-    function animate() {
-      generateNoise();
-      animationId = requestAnimationFrame(animate);
-    }
-
-    // Start animation
-    animate();
+    // Use setInterval instead of rAF to prevent pausing on click
+    generateNoise();
+    window._noiseInterval = window.setInterval(generateNoise, 50); // ~20fps
 
     // Fade in after page content is ready
     requestAnimationFrame(() => {
@@ -124,8 +142,10 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
 
     // Cleanup on page transition
     document.addEventListener('astro:before-preparation', () => {
-      cancelAnimationFrame(animationId);
-    });
+      if (window._noiseInterval) {
+        clearInterval(window._noiseInterval);
+      }
+    }, { once: true });
   }
 
   // Initialize on load
