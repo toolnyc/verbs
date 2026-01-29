@@ -38,16 +38,8 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <title>{title}</title>
   </head>
   <body>
-    <!-- SVG noise filter for texture overlay -->
-    <svg class="noise-filter" aria-hidden="true">
-      <filter id="noise">
-        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" seed="0">
-          <animate attributeName="seed" from="0" to="100" dur="1s" repeatCount="indefinite" />
-        </feTurbulence>
-        <feColorMatrix type="saturate" values="0" />
-      </filter>
-    </svg>
-    <div class="noise-overlay" aria-hidden="true"></div>
+    <!-- Canvas noise overlay -->
+    <canvas id="noise-canvas" class="noise-overlay" aria-hidden="true"></canvas>
 
     <!-- MVP: Mix functionality gated - uncomment to re-enable -->
     <!-- <PersistentPlayer mixes={mixes} /> -->
@@ -56,22 +48,13 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
 </html>
 
 <style is:global>
-  /* Noise texture overlay - subtle inkbleed effect */
-  .noise-filter {
-    position: absolute;
-    width: 0;
-    height: 0;
-  }
-
+  /* Canvas noise texture overlay */
   .noise-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 9999;
     opacity: 0.12;
-    mix-blend-mode: overlay;
-    filter: url(#noise);
-    background: #808080;
   }
 
   /* Disable on reduced motion preference */
@@ -81,4 +64,59 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     }
   }
 </style>
+
+<script>
+  function initNoise() {
+    const canvas = document.getElementById('noise-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size to viewport
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Generate and animate noise
+    function generateNoise() {
+      const imageData = ctx.createImageData(canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const value = Math.random() * 255;
+        data[i] = value;     // R
+        data[i + 1] = value; // G
+        data[i + 2] = value; // B
+        data[i + 3] = 255;   // A
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // Animate at ~24fps for visible movement
+    let animationId: number;
+    function animate() {
+      generateNoise();
+      animationId = requestAnimationFrame(animate);
+    }
+
+    // Start animation
+    animate();
+
+    // Cleanup on page transition
+    document.addEventListener('astro:before-preparation', () => {
+      cancelAnimationFrame(animationId);
+    });
+  }
+
+  // Initialize on load
+  initNoise();
+
+  // Re-initialize after Astro view transitions
+  document.addEventListener('astro:page-load', initNoise);
+</script>
 
