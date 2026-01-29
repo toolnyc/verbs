@@ -92,33 +92,3 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
     color: var(--color-fg);
   }
 </style>
-
-<style is:global>
-  @media (max-width: 768px) {
-    .tier {
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: var(--space-sm) !important;
-    }
-
-    .tier .tier-info {
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .tier .buy-btn {
-      width: 100%;
-      text-align: center;
-    }
-
-    .tier .door-price {
-      text-align: center;
-    }
-
-    .tier .badge-sold-out {
-      text-align: center;
-      display: block;
-    }
-  }
-</style>
