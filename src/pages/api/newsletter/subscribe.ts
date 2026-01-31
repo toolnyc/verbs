@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { addToResendAudience } from '../../../lib/resend';
+import { addToResendAudience, sendWelcomeEmail } from '../../../lib/resend';
 
 // Simple in-memory rate limiting (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -27,6 +27,29 @@ function checkRateLimit(ip: string): boolean {
 function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
+}
+
+async function getNextUpcomingEvent() {
+  if (!supabaseAdmin) return null;
+
+  const { data: event } = await supabaseAdmin
+    .from('events')
+    .select('title, date, timezone, venue_name, venue_city')
+    .eq('status', 'published')
+    .gte('date', new Date().toISOString())
+    .order('date', { ascending: true })
+    .limit(1)
+    .single();
+
+  if (!event) return null;
+
+  return {
+    title: event.title,
+    date: new Date(event.date),
+    timezone: event.timezone || 'America/New_York',
+    venueName: event.venue_name,
+    venueCity: event.venue_city,
+  };
 }
 
 export const POST: APIRoute = async ({ request, clientAddress }) => {
@@ -61,7 +84,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // Check if already subscribed
     const { data: existing } = await supabaseAdmin
       .from('newsletter_subscribers')
-      .select('id, unsubscribed_at')
+      .select('id, unsubscribed_at, unsubscribe_token')
       .eq('email', email.toLowerCase())
       .single();
 
@@ -81,7 +104,18 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
           await addToResendAudience(email.toLowerCase());
         } catch (err) {
           console.warn('Failed to add to Resend audience:', err);
-          // Don't fail the subscription if Resend sync fails
+        }
+
+        // Send welcome email
+        try {
+          const upcomingEvent = await getNextUpcomingEvent();
+          await sendWelcomeEmail({
+            to: email.toLowerCase(),
+            unsubscribeToken: existing.unsubscribe_token,
+            upcomingEvent,
+          });
+        } catch (err) {
+          console.warn('Failed to send welcome email:', err);
         }
 
         return new Response(
@@ -97,14 +131,16 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     }
 
     // Insert new subscriber
-    const { error: insertError } = await supabaseAdmin
+    const { data: newSubscriber, error: insertError } = await supabaseAdmin
       .from('newsletter_subscribers')
       .insert({
         email: email.toLowerCase(),
         source,
-      });
+      })
+      .select('unsubscribe_token')
+      .single();
 
-    if (insertError) {
+    if (insertError || !newSubscriber) {
       console.error('Error inserting subscriber:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to subscribe. Please try again.' }),
@@ -117,7 +153,18 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       await addToResendAudience(email.toLowerCase());
     } catch (err) {
       console.warn('Failed to add to Resend audience:', err);
-      // Don't fail the subscription if Resend sync fails
+    }
+
+    // Send welcome email
+    try {
+      const upcomingEvent = await getNextUpcomingEvent();
+      await sendWelcomeEmail({
+        to: email.toLowerCase(),
+        unsubscribeToken: newSubscriber.unsubscribe_token,
+        upcomingEvent,
+      });
+    } catch (err) {
+      console.warn('Failed to send welcome email:', err);
     }
 
     return new Response(

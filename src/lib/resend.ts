@@ -246,6 +246,94 @@ export async function sendTicketConfirmation({
   });
 }
 
+export async function sendWelcomeEmail({
+  to,
+  unsubscribeToken,
+  upcomingEvent,
+}: {
+  to: string;
+  unsubscribeToken: string;
+  upcomingEvent?: {
+    title: string;
+    date: Date;
+    timezone: string;
+    venueName: string;
+    venueCity: string;
+  } | null;
+}) {
+  if (!resend) {
+    console.warn('Resend not configured, skipping email');
+    return;
+  }
+
+  const unsubscribeUrl = `${getSiteUrl()}/unsubscribe?token=${unsubscribeToken}`;
+  const siteUrl = getSiteUrl();
+  const soundcloudUrl = 'https://soundcloud.com/verbs-mia';
+
+  let upcomingEventHtml = '';
+  if (upcomingEvent) {
+    const formattedDate = upcomingEvent.date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+    const formattedTime = upcomingEvent.date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: upcomingEvent.timezone,
+    });
+
+    upcomingEventHtml = `
+      <div style="background: #f5f5f5; padding: 20px; margin: 24px 0;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Next Event</p>
+        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${upcomingEvent.title}</p>
+        <p style="margin: 0; color: #333;">${formattedDate} · ${formattedTime}</p>
+        <p style="margin: 4px 0 0 0; color: #666;">${upcomingEvent.venueName}, ${upcomingEvent.venueCity}</p>
+        <p style="margin: 16px 0 0 0;"><a href="${siteUrl}" style="color: #000;">Get tickets</a></p>
+      </div>
+    `;
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: system-ui, sans-serif; line-height: 1.6; color: #000; max-width: 600px; margin: 0 auto; padding: 20px; }
+        a { color: #000; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        .footer a { color: #666; }
+      </style>
+    </head>
+    <body>
+      <p>Welcome to VERBS.</p>
+      <p>You're now on the list. We'll keep you posted on upcoming events.</p>
+
+      ${upcomingEventHtml}
+
+      <p style="margin-top: 24px;">
+        <a href="${siteUrl}">verbsaroundthe.world</a> · <a href="${soundcloudUrl}">SoundCloud</a>
+      </p>
+
+      <div class="footer">
+        <p>VERBS</p>
+        <p><a href="${unsubscribeUrl}">Unsubscribe</a></p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await resend.emails.send({
+    from: 'VERBS <hello@verbsaroundthe.world>',
+    replyTo: 'subscribe@verbs-mia.com',
+    to,
+    subject: 'Welcome to VERBS',
+    html,
+  });
+}
+
 export async function sendCampaign({
   to,
   subject,
