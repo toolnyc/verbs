@@ -1,14 +1,23 @@
 import type { APIRoute } from 'astro';
 import { put } from '@vercel/blob';
+import { supabaseAdmin } from '../../lib/supabase';
 
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 const allowedAudioTypes = ['audio/mpeg', 'audio/aiff', 'audio/wav', 'audio/x-aiff'];
 const maxImageSize = 5 * 1024 * 1024; // 5MB
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-  // Check auth (simple cookie check)
+  // Verify authentication with Supabase
   const accessToken = cookies.get('sb-access-token')?.value;
-  if (!accessToken) {
+  if (!accessToken || !supabaseAdmin) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(accessToken);
+  if (authError || !user) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { 'Content-Type': 'application/json' } }
