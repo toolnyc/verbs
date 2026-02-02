@@ -31,7 +31,7 @@ export interface Event {
   time_end: string | null;
   timezone: string;
   venue_name: string;
-  venue_city: string;
+  venue_address: string | null;
   venue_link: string | null;
   image_url: string | null;
   flyer_url: string | null;

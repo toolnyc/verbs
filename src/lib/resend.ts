@@ -68,7 +68,7 @@ export async function sendTicketConfirmation({
   eventDate,
   eventTimezone,
   venueName,
-  venueCity,
+  venueAddress,
   tierName,
   quantity,
   amountPaid,
@@ -80,7 +80,7 @@ export async function sendTicketConfirmation({
   eventDate: Date;
   eventTimezone?: string;
   venueName: string;
-  venueCity: string;
+  venueAddress: string | null;
   tierName: string;
   quantity: number;
   amountPaid: number;
@@ -177,7 +177,7 @@ export async function sendTicketConfirmation({
         </div>
         <div class="detail-row">
           <span class="label">Venue</span>
-          <span>${venueName}, ${venueCity}</span>
+          <span>${venueName}${venueAddress ? `, ${venueAddress}` : ''}</span>
         </div>
         <div class="detail-row">
           <span class="label">Ticket</span>
@@ -238,7 +238,7 @@ export async function sendTicketConfirmation({
   `;
 
   await resend.emails.send({
-    from: 'VERBS <tickets@verbsaroundthe.world>',
+    from: 'VERBS <tickets@verbs.miami>',
     replyTo: 'subscribe@verbs-mia.com',
     to,
     subject: `Your tickets for ${eventTitle}`,
@@ -258,7 +258,7 @@ export async function sendWelcomeEmail({
     date: Date;
     timezone: string;
     venueName: string;
-    venueCity: string;
+    venueAddress: string | null;
   } | null;
 }) {
   if (!resend) {
@@ -289,7 +289,7 @@ export async function sendWelcomeEmail({
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Next Event</p>
         <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${upcomingEvent.title}</p>
         <p style="margin: 0; color: #333;">${formattedDate} · ${formattedTime}</p>
-        <p style="margin: 4px 0 0 0; color: #666;">${upcomingEvent.venueName}, ${upcomingEvent.venueCity}</p>
+        <p style="margin: 4px 0 0 0; color: #666;">${upcomingEvent.venueName}${upcomingEvent.venueAddress ? `, ${upcomingEvent.venueAddress}` : ''}</p>
         <p style="margin: 16px 0 0 0;"><a href="${siteUrl}" style="color: #000;">Get tickets</a></p>
       </div>
     `;
@@ -326,7 +326,7 @@ export async function sendWelcomeEmail({
   `;
 
   await resend.emails.send({
-    from: 'VERBS <hello@verbsaroundthe.world>',
+    from: 'VERBS <hello@verbs.miami>',
     replyTo: 'subscribe@verbs-mia.com',
     to,
     subject: 'Welcome to VERBS',
@@ -375,7 +375,7 @@ export async function sendCampaign({
   `;
 
   await resend.emails.send({
-    from: 'VERBS <hello@verbsaroundthe.world>',
+    from: 'VERBS <hello@verbs.miami>',
     replyTo: 'subscribe@verbs-mia.com',
     to,
     subject,

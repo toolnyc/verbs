@@ -34,7 +34,7 @@ async function getNextUpcomingEvent() {
 
   const { data: event } = await supabaseAdmin
     .from('events')
-    .select('title, date, timezone, venue_name, venue_city')
+    .select('title, date, timezone, venue_name, venue_address')
     .eq('status', 'published')
     .gte('date', new Date().toISOString())
     .order('date', { ascending: true })
@@ -48,7 +48,7 @@ async function getNextUpcomingEvent() {
     date: new Date(event.date),
     timezone: event.timezone || 'America/New_York',
     venueName: event.venue_name,
-    venueCity: event.venue_city,
+    venueAddress: event.venue_address,
   };
 }
 

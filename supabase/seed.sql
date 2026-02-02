@@ -22,7 +22,7 @@ INSERT INTO djs (id, name, instagram_url, soundcloud_url) VALUES
 -- ============================================
 
 -- Upcoming Event: February 7, 2026 (from website)
-INSERT INTO events (id, title, description, date, time_end, venue_name, venue_city, venue_link, image_url, status) VALUES
+INSERT INTO events (id, title, description, date, time_end, venue_name, venue_address, venue_link, image_url, status) VALUES
   ('e1000000-0000-0000-0000-000000000001',
    'WANDER',
    'Each VERBS event focuses on a unique verb, transforming unconventional spaces into an intimate dance floor. We book artists who create a surprise & delight experience. 21+ only. No phones on the dance floor.',
@@ -35,7 +35,7 @@ INSERT INTO events (id, title, description, date, time_end, venue_name, venue_ci
    'published');
 
 -- Past Event: December 2025
-INSERT INTO events (id, title, description, date, time_end, venue_name, venue_city, venue_link, image_url, status) VALUES
+INSERT INTO events (id, title, description, date, time_end, venue_name, venue_address, venue_link, image_url, status) VALUES
   ('e2000000-0000-0000-0000-000000000002',
    'DISSOLVE',
    'A night of deep, hypnotic sounds in an unexpected Miami warehouse space. Let go and dissolve into the music.',
@@ -48,7 +48,7 @@ INSERT INTO events (id, title, description, date, time_end, venue_name, venue_ci
    'archived');
 
 -- Past Event: October 2025
-INSERT INTO events (id, title, description, date, time_end, venue_name, venue_city, venue_link, image_url, status) VALUES
+INSERT INTO events (id, title, description, date, time_end, venue_name, venue_address, venue_link, image_url, status) VALUES
   ('e3000000-0000-0000-0000-000000000003',
    'DRIFT',
    'An evening of organic and melodic house, drifting through sound in an intimate rooftop setting.',
@@ -61,7 +61,7 @@ INSERT INTO events (id, title, description, date, time_end, venue_name, venue_ci
    'archived');
 
 -- Draft Event: March 2026
-INSERT INTO events (id, title, description, date, time_end, venue_name, venue_city, venue_link, image_url, status) VALUES
+INSERT INTO events (id, title, description, date, time_end, venue_name, venue_address, venue_link, image_url, status) VALUES
   ('e4000000-0000-0000-0000-000000000004',
    'EMERGE',
    'Spring awakening. Details coming soon.',

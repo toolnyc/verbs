@@ -12,7 +12,7 @@ let orderDetails: {
   eventDate: Date;
   eventTimezone: string;
   venueName: string;
-  venueCity: string;
+  venueAddress: string | null;
   tierName: string;
   quantity: number;
   amountPaid: number;
@@ -48,7 +48,7 @@ if (!orderNumber) {
         eventDate: new Date(order.event?.date),
         eventTimezone: order.event?.timezone || 'America/New_York',
         venueName: order.event?.venue_name || '',
-        venueCity: order.event?.venue_city || '',
+        venueAddress: order.event?.venue_address || null,
         tierName: order.tier?.name || 'Unknown Tier',
         quantity: order.quantity,
         amountPaid: order.amount_paid,

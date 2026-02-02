@@ -16,7 +16,7 @@ let orderDetails: {
   eventDate: Date;
   eventTimezone: string;
   venueName: string;
-  venueCity: string;
+  venueAddress: string | null;
   tierName: string;
   quantity: number;
   amountPaid: number;
@@ -59,7 +59,7 @@ if (!sessionId) {
             eventDate: new Date(event.date),
             eventTimezone: event.timezone || 'America/New_York',
             venueName: event.venue_name,
-            venueCity: event.venue_city,
+            venueAddress: event.venue_address,
             tierName: tier.name,
             quantity,
             amountPaid: (session.amount_total || 0) / 100,
@@ -154,7 +154,7 @@ if (verifyUrl) {
 
             <div class="detail-row">
               <span class="detail-label text-sm text-muted">Venue</span>
-              <span class="detail-value">{orderDetails.venueName}, {orderDetails.venueCity}</span>
+              <span class="detail-value">{orderDetails.venueName}{orderDetails.venueAddress && `, ${orderDetails.venueAddress}`}</span>
             </div>
 
             <div class="detail-row">

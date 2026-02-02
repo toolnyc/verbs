@@ -101,7 +101,7 @@ npx vercel
 
 ### events
 - `id`, `title`, `description`, `date`, `time_end`
-- `venue_name`, `venue_city`, `venue_link`, `image_url`
+- `venue_name`, `venue_address`, `venue_link`, `image_url`
 - `status`: draft | published | archived
 
 ### ticket_tiers

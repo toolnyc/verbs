@@ -16,7 +16,7 @@ CREATE TABLE events (
   date TIMESTAMPTZ NOT NULL,
   time_end TIMESTAMPTZ,
   venue_name TEXT NOT NULL,
-  venue_city TEXT NOT NULL,
+  venue_address TEXT,
   venue_link TEXT,
   image_url TEXT,
   status event_status DEFAULT 'draft',

@@ -1,5 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
+import FileUpload from '../../../components/admin/FileUpload.astro';
+import AddressAutocomplete from '../../../components/admin/AddressAutocomplete.astro';
 import { supabaseAdmin } from '../../../lib/supabase';
 
 let error = '';
@@ -12,9 +14,14 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
     description: formData.get('description') as string || null,
     date: formData.get('date') as string,
     time_end: formData.get('time_end') as string || null,
+    timezone: formData.get('timezone') as string || 'America/New_York',
     venue_name: formData.get('venue_name') as string,
-    venue_city: formData.get('venue_city') as string,
+    venue_address: formData.get('venue_address') as string || null,
     venue_link: formData.get('venue_link') as string || null,
+    image_url: formData.get('flyer_url') as string || null,
+    flyer_url: formData.get('flyer_url') as string || null,
+    hover_color: formData.get('hover_color') as string || null,
+    door_only_mode: formData.get('door_only_mode') === 'on',
     status: formData.get('status') as string || 'draft',
   };
 
@@ -46,6 +53,14 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
       <textarea id="description" name="description" rows="4"></textarea>
     </div>
 
+    <div class="form-group">
+      <FileUpload
+        name="flyer_url"
+        type="image"
+        label="Event Flyer"
+      />
+    </div>
+
     <div class="form-row">
       <div class="form-group">
         <label for="date" class="form-label">Start Date & Time *</label>
@@ -58,30 +73,67 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
       </div>
     </div>
 
+    <div class="form-group">
+      <label for="timezone" class="form-label">Timezone</label>
+      <select id="timezone" name="timezone">
+        <option value="America/New_York" selected>Eastern (America/New_York)</option>
+        <option value="America/Chicago">Central (America/Chicago)</option>
+        <option value="America/Denver">Mountain (America/Denver)</option>
+        <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+        <option value="America/Phoenix">Arizona (America/Phoenix)</option>
+        <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+        <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+        <option value="Europe/London">UK (Europe/London)</option>
+        <option value="Europe/Paris">Central Europe (Europe/Paris)</option>
+        <option value="Europe/Berlin">Germany (Europe/Berlin)</option>
+        <option value="Europe/Amsterdam">Netherlands (Europe/Amsterdam)</option>
+        <option value="Asia/Tokyo">Japan (Asia/Tokyo)</option>
+        <option value="Asia/Shanghai">China (Asia/Shanghai)</option>
+        <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="venue_name" class="form-label">Venue Name *</label>
+      <input type="text" id="venue_name" name="venue_name" required />
+    </div>
+
+    <div class="form-group">
+      <AddressAutocomplete
+        name="venue_address"
+        venueLinkName="venue_link"
+      />
+    </div>
+
     <div class="form-row">
       <div class="form-group">
-        <label for="venue_name" class="form-label">Venue Name *</label>
-        <input type="text" id="venue_name" name="venue_name" required />
+        <label for="status" class="form-label">Status</label>
+        <select id="status" name="status">
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+        <p class="form-hint">Draft events are not visible to the public</p>
       </div>
 
       <div class="form-group">
-        <label for="venue_city" class="form-label">City *</label>
-        <input type="text" id="venue_city" name="venue_city" required />
+        <label for="hover_color" class="form-label">Hover Color</label>
+        <select id="hover_color" name="hover_color">
+          <option value="">Default (Black)</option>
+          <option value="#f20519">Red</option>
+          <option value="#f2b705">Yellow</option>
+          <option value="#1bf59f">Green</option>
+          <option value="#3a5cb9">Blue</option>
+        </select>
+        <p class="form-hint">Color shown on hover in the event grid</p>
       </div>
     </div>
 
     <div class="form-group">
-      <label for="venue_link" class="form-label">Venue Link (Google Maps, etc.)</label>
-      <input type="url" id="venue_link" name="venue_link" placeholder="https://" />
-    </div>
-
-    <div class="form-group">
-      <label for="status" class="form-label">Status</label>
-      <select id="status" name="status">
-        <option value="draft">Draft</option>
-        <option value="published">Published</option>
-      </select>
-      <p class="form-hint">Draft events are not visible to the public</p>
+      <label class="checkbox-label">
+        <input type="checkbox" name="door_only_mode" />
+        <span>Door Sales Mode</span>
+      </label>
+      <p class="form-hint">Enable QR code for simplified mobile checkout at the door</p>
     </div>
 
     <div class="form-actions">
@@ -109,5 +161,17 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
     color: #c5221f;
     padding: var(--space-md);
     font-size: var(--text-sm);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
   }
 </style>
