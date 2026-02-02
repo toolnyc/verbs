@@ -221,7 +221,7 @@ export async function sendTicketConfirmation({
         <div>
           <h3>Liability</h3>
           <ul>
-            <li>VERBS is not responsible for lost or stolen goods. Email info@verbs-mia.com if you lost something.</li>
+            <li>VERBS is not responsible for lost or stolen goods. Email gio@verbs-mia.com if you lost something.</li>
           </ul>
         </div>
       </div>
