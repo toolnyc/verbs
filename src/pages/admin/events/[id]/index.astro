@@ -3,7 +3,7 @@ import Admin from '../../../../layouts/Admin.astro';
 import FileUpload from '../../../../components/admin/FileUpload.astro';
 import AddressAutocomplete from '../../../../components/admin/AddressAutocomplete.astro';
 import { supabaseAdmin } from '../../../../lib/supabase';
-import { createProductAndPrice, updatePrice, updateProductName, archiveProduct } from '../../../../lib/stripe';
+import { createProductAndPrice, updatePrice, updateProductName, archiveProduct, archiveProductsForEvent } from '../../../../lib/stripe';
 
 const { id } = Astro.params;
 
@@ -58,7 +58,9 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
 
   if (action === 'update_event') {
     const newTitle = formData.get('title') as string;
+    const newStatus = formData.get('status') as string;
     const titleChanged = newTitle !== event.title;
+    const statusChangedToArchived = newStatus === 'archived' && event.status !== 'archived';
 
     const { error: updateError } = await supabaseAdmin
       .from('events')
@@ -138,7 +140,21 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         }
       }
 
-      if (!error) {
+      // If status changed to archived, archive all Stripe products for this event
+      if (statusChangedToArchived) {
+        try {
+          const archivedCount = await archiveProductsForEvent(id!);
+          if (archivedCount > 0 && !error) {
+            success = `Event archived (${archivedCount} Stripe product${archivedCount > 1 ? 's' : ''} deactivated)`;
+          }
+        } catch (stripeErr: any) {
+          error = error
+            ? `${error}. Also failed to archive Stripe products: ${stripeErr.message}`
+            : `Event archived but failed to deactivate Stripe products: ${stripeErr.message}`;
+        }
+      }
+
+      if (!error && !success) {
         success = 'Event updated';
       }
       // Refresh event data
