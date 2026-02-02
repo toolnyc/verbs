@@ -16,7 +16,7 @@ const {
   description = 'Events from VERBS collective'
 } = Astro.props;
 
-const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world/';
+const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami/';
 
 // MVP: Mix functionality gated - uncomment to re-enable
 // const mixes = await getPublishedMixes();
@@ -29,10 +29,18 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.w
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#000000" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={siteUrl} />
+    <meta property="og:image" content={`${siteUrl}og-image.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={`${siteUrl}og-image.png`} />
     <Font cssVariable="--font-sans" preload />
     <ViewTransitions />
     <title>{title}</title>

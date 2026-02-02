@@ -43,7 +43,7 @@ BLOB_READ_WRITE_TOKEN=
 RESEND_API_KEY=
 
 # App
-PUBLIC_SITE_URL=https://www.verbsaroundthe.world/
+PUBLIC_SITE_URL=https://www.verbs.miami/
 ```
 
 ### 3. Run database schema

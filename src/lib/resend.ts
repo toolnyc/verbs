@@ -6,7 +6,7 @@ const resendAudienceId = import.meta.env.RESEND_AUDIENCE_ID;
 
 // Get site URL at runtime to ensure correct environment URL
 function getSiteUrl(): string {
-  return (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world').replace(/\/$/, '');
+  return (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami').replace(/\/$/, '');
 }
 
 export const resend = resendApiKey ? new Resend(resendApiKey) : null;
@@ -314,7 +314,7 @@ export async function sendWelcomeEmail({
       ${upcomingEventHtml}
 
       <p style="margin-top: 24px;">
-        <a href="${siteUrl}">verbsaroundthe.world</a> · <a href="${soundcloudUrl}">SoundCloud</a>
+        <a href="${siteUrl}">Website</a> · <a href="${soundcloudUrl}">SoundCloud</a>
       </p>
 
       <div class="footer">

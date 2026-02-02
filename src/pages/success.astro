@@ -6,7 +6,7 @@ import { supabaseAdmin } from '../lib/supabase';
 import QRCode from 'qrcode';
 
 const sessionId = Astro.url.searchParams.get('session_id');
-const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbsaroundthe.world').replace(/\/$/, '');
+const siteUrl = (import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami').replace(/\/$/, '');
 
 let orderDetails: {
   orderNumber: number | null;
