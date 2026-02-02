@@ -1,0 +1,184 @@
+---
+interface Props {
+  name: string;
+  currentValue?: string;
+  venueLinkName: string;
+  currentVenueLink?: string;
+}
+
+const { name, currentValue, venueLinkName, currentVenueLink } = Astro.props;
+const inputId = `address-${name}`;
+---
+
+<div class="address-autocomplete">
+  <label for={inputId} class="form-label">Address</label>
+  <div class="address-input-wrapper">
+    <input
+      type="text"
+      id={inputId}
+      name={name}
+      value={currentValue || ''}
+      placeholder="Start typing an address..."
+      autocomplete="off"
+      class="address-input"
+    />
+    <div class="address-suggestions" id={`${inputId}-suggestions`}></div>
+  </div>
+  <input type="hidden" name={venueLinkName} value={currentVenueLink || ''} class="venue-link-input" />
+  <p class="form-hint">Type to search for an address. Map link will be auto-generated.</p>
+</div>
+
+<style>
+  .address-autocomplete {
+    position: relative;
+  }
+
+  .address-input-wrapper {
+    position: relative;
+  }
+
+  .address-input {
+    width: 100%;
+  }
+
+  .address-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+  }
+
+  .address-suggestions.active {
+    display: block;
+  }
+
+  .address-suggestion {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .address-suggestion:last-child {
+    border-bottom: none;
+  }
+
+  .address-suggestion:hover {
+    background: var(--color-bg-alt);
+  }
+
+  .address-suggestion.selected {
+    background: var(--color-bg-alt);
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.address-autocomplete').forEach(container => {
+    const input = container.querySelector('.address-input') as HTMLInputElement;
+    const suggestionsEl = container.querySelector('.address-suggestions') as HTMLElement;
+    const venueLinkInput = container.querySelector('.venue-link-input') as HTMLInputElement;
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let selectedIndex = -1;
+    let suggestions: any[] = [];
+
+    const searchAddress = async (query: string) => {
+      if (query.length < 3) {
+        suggestionsEl.innerHTML = '';
+        suggestionsEl.classList.remove('active');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`,
+          {
+            headers: {
+              'User-Agent': 'VERBS-Events-App'
+            }
+          }
+        );
+
+        suggestions = await response.json();
+
+        if (suggestions.length === 0) {
+          suggestionsEl.innerHTML = '<div class="address-suggestion">No results found</div>';
+          suggestionsEl.classList.add('active');
+          return;
+        }
+
+        suggestionsEl.innerHTML = suggestions.map((s: any, i: number) =>
+          `<div class="address-suggestion" data-index="${i}">${s.display_name}</div>`
+        ).join('');
+        suggestionsEl.classList.add('active');
+        selectedIndex = -1;
+      } catch (err) {
+        console.error('Address search failed:', err);
+      }
+    };
+
+    const selectSuggestion = (index: number) => {
+      const suggestion = suggestions[index];
+      if (!suggestion) return;
+
+      input.value = suggestion.display_name;
+
+      // Generate Google Maps link
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(suggestion.display_name)}`;
+      venueLinkInput.value = mapsLink;
+
+      suggestionsEl.classList.remove('active');
+      suggestions = [];
+      selectedIndex = -1;
+    };
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        searchAddress(input.value);
+      }, 500);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const items = suggestionsEl.querySelectorAll('.address-suggestion[data-index]');
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        items.forEach((item, i) => item.classList.toggle('selected', i === selectedIndex));
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        selectSuggestion(selectedIndex);
+      } else if (e.key === 'Escape') {
+        suggestionsEl.classList.remove('active');
+      }
+    });
+
+    suggestionsEl.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const index = target.dataset.index;
+      if (index !== undefined) {
+        selectSuggestion(parseInt(index, 10));
+      }
+    });
+
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!container.contains(e.target as Node)) {
+        suggestionsEl.classList.remove('active');
+      }
+    });
+  });
+</script>

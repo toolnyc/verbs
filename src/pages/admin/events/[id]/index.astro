@@ -1,6 +1,7 @@
 ---
 import Admin from '../../../../layouts/Admin.astro';
 import FileUpload from '../../../../components/admin/FileUpload.astro';
+import AddressAutocomplete from '../../../../components/admin/AddressAutocomplete.astro';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { createProductAndPrice, updatePrice, updateProductName, archiveProduct } from '../../../../lib/stripe';
 
@@ -68,7 +69,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         time_end: formData.get('time_end') || null,
         timezone: formData.get('timezone') || 'America/New_York',
         venue_name: formData.get('venue_name'),
-        venue_city: formData.get('venue_city'),
+        venue_address: formData.get('venue_address') || null,
         venue_link: formData.get('venue_link') || null,
         image_url: formData.get('flyer_url') || null,
         flyer_url: formData.get('flyer_url') || null,
@@ -444,6 +445,9 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   {error && <p class="error-message mb-lg">{error}</p>}
   {success && <p class="success-message mb-lg">{success}</p>}
 
+  <!-- Toast notification container -->
+  <div id="toast-container" class="toast-container"></div>
+
   <div class="edit-grid">
     <div class="edit-main">
       <form method="POST" class="admin-form">
@@ -500,22 +504,18 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
           </select>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="venue_name" class="form-label">Venue Name *</label>
-            <input type="text" id="venue_name" name="venue_name" value={event.venue_name} required />
-          </div>
-
-          <div class="form-group">
-            <label for="venue_city" class="form-label">City *</label>
-            <input type="text" id="venue_city" name="venue_city" value={event.venue_city} required />
-          </div>
+        <div class="form-group">
+          <label for="venue_name" class="form-label">Venue Name *</label>
+          <input type="text" id="venue_name" name="venue_name" value={event.venue_name} required />
         </div>
 
         <div class="form-group">
-          <label for="venue_link" class="form-label">Venue Link</label>
-          <input type="url" id="venue_link" name="venue_link" value={event.venue_link || ''} placeholder="https://maps.google.com/..." />
-          <p class="form-hint">Google Maps URL for venue location</p>
+          <AddressAutocomplete
+            name="venue_address"
+            currentValue={event.venue_address}
+            venueLinkName="venue_link"
+            currentVenueLink={event.venue_link}
+          />
         </div>
 
         <div class="form-row">
@@ -633,19 +633,16 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
                     )}
                   </div>
                 </div>
-                <form method="POST" class="tier-edit-form" id={`edit-tier-${tier.id}`} style="display: none;">
-                  <input type="hidden" name="action" value="update_tier" />
-                  <input type="hidden" name="tier_id" value={tier.id} />
-                  <div class="tier-form-grid">
-                    <input type="text" name="tier_name" value={tier.name} placeholder="Name" required />
-                    <input type="number" name="tier_price" value={tier.price} placeholder="Price" step="0.01" min="0" required />
-                    <input type="number" name="tier_max_stock" value={tier.max_stock || ''} placeholder="Stock (blank=unlimited)" min="0" />
-                    <button type="submit" class="btn-sm">Save</button>
+                <div class="tier-edit-form" id={`edit-tier-${tier.id}`} style="display: none;" data-tier-id={tier.id}>
+                  <div class="tier-form-grid tier-form-grid-autosave">
+                    <input type="text" name="tier_name" value={tier.name} placeholder="Name" class="tier-autosave-input" data-field="name" required />
+                    <input type="number" name="tier_price" value={tier.price} placeholder="Price" step="0.01" min="0" class="tier-autosave-input" data-field="price" required />
+                    <input type="number" name="tier_max_stock" value={tier.max_stock || ''} placeholder="Stock (blank=unlimited)" min="0" class="tier-autosave-input" data-field="max_stock" />
                   </div>
                   {tier.stripe_price_id && (
-                    <p class="form-hint mt-sm">Changes will sync to Stripe automatically</p>
+                    <p class="form-hint mt-sm">Changes auto-save and sync to Stripe</p>
                   )}
-                </form>
+                </div>
               </div>
             ))}
           </div>
@@ -674,40 +671,54 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
         </div>
 
         <div class="djs-list" id="djs-list">
-          {eventDjs.map(ed => (
-            <div class="dj-item" data-event-dj-id={ed.id}>
-              <div class="dj-info">
-                <span class="dj-name">{ed.dj?.name}</span>
-                <form method="POST" class="dj-times-form">
-                  <input type="hidden" name="action" value="update_dj_times" />
-                  <input type="hidden" name="event_dj_id" value={ed.id} />
-                  <div class="time-inputs">
-                    <input
-                      type="time"
-                      name="slot_start"
-                      value={ed.slot_start || ''}
-                      placeholder="Start"
-                      class="time-input"
-                    />
-                    <span class="time-separator">—</span>
-                    <input
-                      type="time"
-                      name="slot_end"
-                      value={ed.slot_end || ''}
-                      placeholder="End"
-                      class="time-input"
-                    />
-                    <button type="submit" class="btn-sm">Save</button>
+          {eventDjs.map(ed => {
+            const hasTimes = ed.slot_start || ed.slot_end;
+            return (
+              <div class="dj-item" data-event-dj-id={ed.id}>
+                <div class="dj-info">
+                  <div class="dj-header">
+                    <span class="dj-name">{ed.dj?.name}</span>
+                    {hasTimes && (
+                      <span class="dj-times-display">
+                        {ed.slot_start || '?'} — {ed.slot_end || '?'}
+                      </span>
+                    )}
                   </div>
+                  <div class="dj-times-container" data-has-times={hasTimes ? 'true' : 'false'}>
+                    <button type="button" class="dj-times-toggle text-sm" data-event-dj-id={ed.id}>
+                      {hasTimes ? 'Edit times' : '+ Set times'}
+                    </button>
+                    <div class="dj-times-inputs" style={hasTimes ? '' : 'display: none;'}>
+                      <div class="time-inputs">
+                        <input
+                          type="time"
+                          name="slot_start"
+                          value={ed.slot_start || ''}
+                          placeholder="Start"
+                          class="time-input"
+                          data-event-dj-id={ed.id}
+                        />
+                        <span class="time-separator">—</span>
+                        <input
+                          type="time"
+                          name="slot_end"
+                          value={ed.slot_end || ''}
+                          placeholder="End"
+                          class="time-input"
+                          data-event-dj-id={ed.id}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <form method="POST" class="inline-form">
+                  <input type="hidden" name="action" value="remove_dj" />
+                  <input type="hidden" name="event_dj_id" value={ed.id} />
+                  <button type="submit" class="btn-sm secondary">Remove</button>
                 </form>
               </div>
-              <form method="POST" class="inline-form">
-                <input type="hidden" name="action" value="remove_dj" />
-                <input type="hidden" name="event_dj_id" value={ed.id} />
-                <button type="submit" class="btn-sm secondary">Remove</button>
-              </form>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <form class="add-dj-form" id="add-dj-form" data-event-id={id}>
@@ -721,10 +732,13 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
             </select>
           )}
           <input type="text" name="new_dj_name" id="new-dj-name" placeholder="Or create new DJ..." class="mb-sm" />
-          <div class="time-inputs mb-sm">
-            <input type="time" name="slot_start" id="slot-start" placeholder="Start time" class="time-input" />
-            <span class="time-separator">—</span>
-            <input type="time" name="slot_end" id="slot-end" placeholder="End time" class="time-input" />
+          <div class="add-dj-times-container">
+            <button type="button" class="add-dj-times-toggle text-sm mb-sm" id="add-dj-times-toggle">+ Add set times</button>
+            <div class="time-inputs mb-sm" id="add-dj-times-inputs" style="display: none;">
+              <input type="time" name="slot_start" id="slot-start" placeholder="Start time" class="time-input" />
+              <span class="time-separator">—</span>
+              <input type="time" name="slot_end" id="slot-end" placeholder="End time" class="time-input" />
+            </div>
           </div>
           <button type="submit" class="btn-sm" id="add-dj-btn">Add to Lineup</button>
           <span class="add-dj-status text-sm ml-sm" id="add-dj-status"></span>
@@ -850,8 +864,44 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
     gap: var(--space-xs);
   }
 
+  .dj-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
   .dj-name {
     font-weight: 500;
+  }
+
+  .dj-times-display {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  .dj-times-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .dj-times-toggle,
+  .add-dj-times-toggle {
+    background: none;
+    border: none;
+    color: var(--color-primary, #3a5cb9);
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+  }
+
+  .dj-times-toggle:hover,
+  .add-dj-times-toggle:hover {
+    text-decoration: underline;
+  }
+
+  .dj-times-inputs {
+    margin-top: var(--space-xs);
   }
 
   .dj-times-form {
@@ -984,6 +1034,64 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
   .text-warning {
     color: var(--color-yellow, #f2b705);
   }
+
+  .tier-form-grid-autosave {
+    grid-template-columns: 1fr 80px 100px;
+  }
+
+  /* Toast notifications */
+  .toast-container {
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .toast {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: toast-in 0.2s ease-out;
+  }
+
+  .toast.success {
+    border-left: 3px solid #137333;
+  }
+
+  .toast.error {
+    border-left: 3px solid #c5221f;
+  }
+
+  .toast.fade-out {
+    animation: toast-out 0.3s ease-in forwards;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes toast-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
 </style>
 
 <script>
@@ -1079,20 +1187,26 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
     const div = document.createElement('div');
     div.className = 'dj-item';
     div.dataset.eventDjId = eventDj.id;
+    const hasTimes = eventDj.slot_start || eventDj.slot_end;
 
     div.innerHTML = `
       <div class="dj-info">
-        <span class="dj-name">${eventDj.dj?.name || 'Unknown'}</span>
-        <form method="POST" class="dj-times-form">
-          <input type="hidden" name="action" value="update_dj_times" />
-          <input type="hidden" name="event_dj_id" value="${eventDj.id}" />
-          <div class="time-inputs">
-            <input type="time" name="slot_start" value="${eventDj.slot_start || ''}" placeholder="Start" class="time-input" />
-            <span class="time-separator">—</span>
-            <input type="time" name="slot_end" value="${eventDj.slot_end || ''}" placeholder="End" class="time-input" />
-            <button type="submit" class="btn-sm">Save</button>
+        <div class="dj-header">
+          <span class="dj-name">${eventDj.dj?.name || 'Unknown'}</span>
+          ${hasTimes ? `<span class="dj-times-display">${eventDj.slot_start || '?'} — ${eventDj.slot_end || '?'}</span>` : ''}
+        </div>
+        <div class="dj-times-container" data-has-times="${hasTimes ? 'true' : 'false'}">
+          <button type="button" class="dj-times-toggle text-sm" data-event-dj-id="${eventDj.id}">
+            ${hasTimes ? 'Edit times' : '+ Set times'}
+          </button>
+          <div class="dj-times-inputs" style="${hasTimes ? '' : 'display: none;'}">
+            <div class="time-inputs">
+              <input type="time" name="slot_start" value="${eventDj.slot_start || ''}" placeholder="Start" class="time-input" data-event-dj-id="${eventDj.id}" />
+              <span class="time-separator">—</span>
+              <input type="time" name="slot_end" value="${eventDj.slot_end || ''}" placeholder="End" class="time-input" data-event-dj-id="${eventDj.id}" />
+            </div>
           </div>
-        </form>
+        </div>
       </div>
       <form method="POST" class="inline-form">
         <input type="hidden" name="action" value="remove_dj" />
@@ -1100,6 +1214,22 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
         <button type="submit" class="btn-sm secondary">Remove</button>
       </form>
     `;
+
+    // Add toggle listener
+    const toggle = div.querySelector('.dj-times-toggle') as HTMLButtonElement;
+    const inputs = div.querySelector('.dj-times-inputs') as HTMLElement;
+    if (toggle && inputs) {
+      toggle.addEventListener('click', () => {
+        const isHidden = inputs.style.display === 'none';
+        inputs.style.display = isHidden ? '' : 'none';
+        toggle.textContent = isHidden ? '- Hide times' : '+ Set times';
+      });
+    }
+
+    // Set up autosave for time inputs (function defined later in script)
+    if (typeof setupDjTimesAutosave === 'function') {
+      setupDjTimesAutosave(div);
+    }
 
     return div;
   }
@@ -1116,6 +1246,31 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
       }
     });
   });
+
+  // Toggle DJ times inputs for existing DJs
+  document.querySelectorAll('.dj-times-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const container = btn.closest('.dj-times-container');
+      const inputs = container?.querySelector('.dj-times-inputs') as HTMLElement;
+      if (inputs) {
+        const isHidden = inputs.style.display === 'none';
+        inputs.style.display = isHidden ? '' : 'none';
+        const hasTimes = container?.getAttribute('data-has-times') === 'true';
+        btn.textContent = isHidden ? '- Hide times' : (hasTimes ? 'Edit times' : '+ Set times');
+      }
+    });
+  });
+
+  // Toggle add DJ times inputs
+  const addDjTimesToggle = document.getElementById('add-dj-times-toggle');
+  const addDjTimesInputs = document.getElementById('add-dj-times-inputs');
+  if (addDjTimesToggle && addDjTimesInputs) {
+    addDjTimesToggle.addEventListener('click', () => {
+      const isHidden = addDjTimesInputs.style.display === 'none';
+      addDjTimesInputs.style.display = isHidden ? '' : 'none';
+      addDjTimesToggle.textContent = isHidden ? '- Hide set times' : '+ Add set times';
+    });
+  }
 
   // Copy door URL to clipboard
   const copyUrlBtn = document.getElementById('copy-url-btn');
@@ -1135,4 +1290,157 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
       }
     });
   }
+
+  // Toast notification helper
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => toast.remove(), 300);
+    }, 1500);
+  }
+
+  // Tier autosave on blur
+  document.querySelectorAll('.tier-autosave-input').forEach(input => {
+    const inputEl = input as HTMLInputElement;
+    let originalValue = inputEl.value;
+
+    inputEl.addEventListener('focus', () => {
+      originalValue = inputEl.value;
+    });
+
+    inputEl.addEventListener('blur', async () => {
+      if (inputEl.value === originalValue) return;
+
+      const tierForm = inputEl.closest('.tier-edit-form') as HTMLElement;
+      const tierId = tierForm?.dataset.tierId;
+      if (!tierId) return;
+
+      const field = inputEl.dataset.field;
+      if (!field) return;
+
+      try {
+        const body: Record<string, any> = {};
+        body[field] = inputEl.value;
+
+        const res = await fetch(`/api/admin/tiers/${tierId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          originalValue = inputEl.value;
+          showToast('Saved');
+
+          // Update displayed tier info if name or price changed
+          const tierWrapper = tierForm.closest('.tier-item-wrapper');
+          if (tierWrapper) {
+            if (field === 'name') {
+              const nameEl = tierWrapper.querySelector('.tier-name');
+              if (nameEl) nameEl.textContent = inputEl.value;
+            }
+            if (field === 'price') {
+              const priceEl = tierWrapper.querySelector('.tier-price');
+              if (priceEl) priceEl.textContent = `$${inputEl.value}`;
+            }
+          }
+        } else {
+          showToast(data.error || 'Save failed', 'error');
+          inputEl.value = originalValue;
+        }
+      } catch (err) {
+        showToast('Network error', 'error');
+        inputEl.value = originalValue;
+      }
+    });
+  });
+
+  // DJ times autosave on blur
+  function setupDjTimesAutosave(container: Element) {
+    const inputs = container.querySelectorAll('.time-input[data-event-dj-id]');
+    inputs.forEach(input => {
+      const inputEl = input as HTMLInputElement;
+      let originalValue = inputEl.value;
+
+      inputEl.addEventListener('focus', () => {
+        originalValue = inputEl.value;
+      });
+
+      inputEl.addEventListener('blur', async () => {
+        if (inputEl.value === originalValue) return;
+
+        const eventDjId = inputEl.dataset.eventDjId;
+        if (!eventDjId) return;
+
+        const field = inputEl.name; // slot_start or slot_end
+        if (!field) return;
+
+        try {
+          const body: Record<string, any> = {};
+          body[field] = inputEl.value;
+
+          const res = await fetch(`/api/admin/event-djs/${eventDjId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          const data = await res.json();
+
+          if (res.ok && data.success) {
+            originalValue = inputEl.value;
+            showToast('Saved');
+
+            // Update displayed times
+            const djItem = inputEl.closest('.dj-item');
+            if (djItem && data.eventDj) {
+              const timesDisplay = djItem.querySelector('.dj-times-display');
+              const hasTimes = data.eventDj.slot_start || data.eventDj.slot_end;
+
+              if (hasTimes) {
+                const timesText = `${data.eventDj.slot_start || '?'} — ${data.eventDj.slot_end || '?'}`;
+                if (timesDisplay) {
+                  timesDisplay.textContent = timesText;
+                } else {
+                  // Create the times display if it doesn't exist
+                  const header = djItem.querySelector('.dj-header');
+                  if (header) {
+                    const span = document.createElement('span');
+                    span.className = 'dj-times-display';
+                    span.textContent = timesText;
+                    header.appendChild(span);
+                  }
+                }
+
+                // Update the toggle text and data attribute
+                const container = djItem.querySelector('.dj-times-container');
+                const toggle = djItem.querySelector('.dj-times-toggle');
+                if (container) container.setAttribute('data-has-times', 'true');
+                if (toggle) toggle.textContent = '- Hide times';
+              }
+            }
+          } else {
+            showToast(data.error || 'Save failed', 'error');
+            inputEl.value = originalValue;
+          }
+        } catch (err) {
+          showToast('Network error', 'error');
+          inputEl.value = originalValue;
+        }
+      });
+    });
+  }
+
+  // Set up autosave for existing DJ items
+  document.querySelectorAll('.dj-item').forEach(setupDjTimesAutosave);
 </script>

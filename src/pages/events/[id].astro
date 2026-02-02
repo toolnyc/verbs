@@ -4,6 +4,7 @@ import Footer from '../../components/public/Footer.astro';
 import TicketTier from '../../components/public/TicketTier.astro';
 import HouseRulesModal from '../../components/public/HouseRulesModal.astro';
 import { getEventWithDetails } from '../../lib/supabase';
+import { formatDisplayAddress } from '../../lib/utils';
 
 const { id } = Astro.params;
 
@@ -57,6 +58,8 @@ const formattedYear = eventDate.getFullYear();
 
 // For countdown - use this event if it's in the future
 const nextEventDate = !isPast ? event.date : null;
+
+const displayAddress = formatDisplayAddress(event.venue_address);
 ---
 
 <Base title={`${event.title} - VERBS`} description={event.description || `${event.title} at ${event.venue_name}`}>
@@ -87,7 +90,7 @@ const nextEventDate = !isPast ? event.date : null;
         <div class="event-info">
           <div class="venue">
             <p class="venue-name">{event.venue_name}</p>
-            <p class="venue-city text-muted">{event.venue_city}</p>
+            {displayAddress && <p class="venue-city text-muted">{displayAddress}</p>}
             {event.venue_link && (
               <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">
                 View map &rarr;

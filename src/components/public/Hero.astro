@@ -1,5 +1,6 @@
 ---
 import type { Event, TicketTier, DJ } from '../../lib/supabase';
+import { formatDisplayAddress } from '../../lib/utils';
 import TicketTierButton from './TicketTier.astro';
 
 interface Props {
@@ -34,6 +35,8 @@ const timezoneAbbr = new Intl.DateTimeFormat('en-US', {
 }).formatToParts(eventDate).find(p => p.type === 'timeZoneName')?.value || '';
 
 const formattedYear = eventDate.getFullYear();
+
+const displayAddress = formatDisplayAddress(event.venue_address);
 ---
 
 <section class="hero" class:list={{ past: isPast }}>
@@ -56,7 +59,7 @@ const formattedYear = eventDate.getFullYear();
       <div class="hero-info">
         <div class="venue">
           <p class="venue-name">{event.venue_name}</p>
-          <p class="venue-city text-muted">{event.venue_city}</p>
+          {displayAddress && <p class="venue-city text-muted">{displayAddress}</p>}
           {event.venue_link && (
             <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">
               View map

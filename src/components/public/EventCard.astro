@@ -1,5 +1,6 @@
 ---
 import type { Event, TicketTier } from '../../lib/supabase';
+import { formatDisplayAddress } from '../../lib/utils';
 import TicketTierButton from './TicketTier.astro';
 
 interface Props {
@@ -27,6 +28,8 @@ const formattedTime = eventDate.toLocaleTimeString('en-GB', {
 });
 
 const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
+
+const displayAddress = formatDisplayAddress(event.venue_address);
 ---
 
 <article class="event-card card-hover" class:list={{ past: isPast, compact }}>
@@ -47,7 +50,7 @@ const tiers = (event.ticket_tiers || []).filter(t => t.is_active);
     <p class="event-meta text-sm text-muted">
       {event.venue_name} · {formattedTime}
     </p>
-    <p class="event-city text-xs text-muted">{event.venue_city}</p>
+    {displayAddress && <p class="event-city text-xs text-muted">{displayAddress}</p>}
   </div>
 
   {!compact && !isPast && tiers.length > 0 && (
