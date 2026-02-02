@@ -27,3 +27,5 @@ pnpm-debug.log*
 
 # supabase temp files
 supabase/.temp/
+supabase/dump-*.sql
+.vercel
