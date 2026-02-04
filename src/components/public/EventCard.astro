@@ -35,7 +35,7 @@ const displayAddress = formatDisplayAddress(event.venue_address);
 <article class="event-card card-hover" class:list={{ past: isPast, compact }}>
   <div class="event-image-wrapper img-hover-reveal">
     {(event.flyer_url || event.image_url) ? (
-      <img src={event.flyer_url || event.image_url} alt={event.title} class="event-image" />
+      <img src={event.flyer_url || event.image_url} alt={event.title} class="event-image" loading="lazy" decoding="async" />
     ) : (
       <div class="event-image img-placeholder"></div>
     )}

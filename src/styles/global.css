@@ -389,6 +389,7 @@ button.accent-green:hover {
 .img-hover-reveal .img-placeholder {
   filter: grayscale(100%) contrast(1.1);
   transition: filter 0.4s ease, transform 0.4s ease;
+  will-change: filter, transform;
 }
 
 .img-hover-reveal:hover img,
@@ -460,6 +461,8 @@ button.accent-green:hover {
   padding: var(--space-2xl) var(--space-lg);
   text-decoration: none;
   transition: background 0.2s ease, color 0.2s ease;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
 }
 
 .verb-item::after {

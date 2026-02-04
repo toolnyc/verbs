@@ -46,7 +46,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
           {isDraft && <span class="draft-badge">Draft</span>}
           {(event.flyer_url || event.image_url) && (
             <div class="flyer-preview">
-              <img src={event.flyer_url || event.image_url} alt={event.title} />
+              <img src={event.flyer_url || event.image_url} alt={event.title} loading="lazy" decoding="async" />
             </div>
           )}
         </a>
@@ -72,7 +72,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
           </span>
           {(event.flyer_url || event.image_url) && (
             <div class="flyer-preview">
-              <img src={event.flyer_url || event.image_url} alt={event.title} />
+              <img src={event.flyer_url || event.image_url} alt={event.title} loading="lazy" decoding="async" />
             </div>
           )}
         </div>
