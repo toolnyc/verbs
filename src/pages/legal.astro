@@ -1,15 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Footer from '../components/public/Footer.astro';
-import { getPublishedEvents, getSiteContentByGroup } from '../lib/supabase';
-
-// Get next event for countdown
-const events = await getPublishedEvents();
-const now = new Date();
-const upcomingEvents = events
-  .filter(e => new Date(e.date) >= now)
-  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;
+import { getSiteContentByGroup } from '../lib/supabase';
 
 // Get legal content from database
 const legalContent = await getSiteContentByGroup('legal');
@@ -28,7 +20,7 @@ const legalContent = await getSiteContentByGroup('legal');
       </section>
     ))}
   </main>
-  <Footer nextEventDate={nextEventDate} />
+  <Footer />
 </Base>
 
 <style>

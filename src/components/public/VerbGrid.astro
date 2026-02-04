@@ -189,7 +189,10 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
 
 <script>
   import gsap from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { createHoverPreview } from '../../lib/animations';
+
+  gsap.registerPlugin(ScrollTrigger);
 
   // Store cleanup functions for re-initialization
   const cleanupFunctions: (() => void)[] = [];
@@ -199,17 +202,49 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     cleanupFunctions.forEach(cleanup => cleanup());
     cleanupFunctions.length = 0;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // Initialize hover previews and animated backgrounds for verb items
     const verbItems = document.querySelectorAll('.verb-item');
 
-    verbItems.forEach(item => {
+    verbItems.forEach((item, index) => {
       const preview = item.querySelector('.flyer-preview') as HTMLElement;
       if (preview) {
+        // Reparent to body so position:fixed works regardless of ancestor transforms
+        document.body.appendChild(preview);
         const cleanup = createHoverPreview(item as HTMLElement, preview);
-        cleanupFunctions.push(cleanup);
+        cleanupFunctions.push(() => {
+          cleanup();
+          // Move back into item so next init can find it (idempotent re-init)
+          item.appendChild(preview);
+        });
       }
 
-      // Only add hover animation to clickable items
+      // --- Scroll-triggered entrance animation ---
+      if (!prefersReducedMotion && !item.classList.contains('featured')) {
+        gsap.set(item, { opacity: 0, y: 30 });
+
+        const st = ScrollTrigger.create({
+          trigger: item,
+          start: 'top 90%',
+          once: true,
+          onEnter: () => {
+            // Cap delay so items already in viewport appear immediately
+            const delay = Math.min(index * 0.04, 0.2);
+            gsap.to(item, {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              delay,
+              ease: 'power2.out',
+            });
+          },
+        });
+
+        cleanupFunctions.push(() => st.kill());
+      }
+
+      // Only add hover/tap animation to clickable items
       if (!item.classList.contains('clickable')) return;
 
       const hoverBg = item.querySelector('.hover-bg') as HTMLElement;
@@ -245,15 +280,40 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
         ease: 'power2.out',
       }, 0.1);
 
-      const onEnter = () => tl.play();
-      const onLeave = () => tl.reverse();
+      // --- Tap color flash (mobile) ---
+      let touched = false;
 
+      const onTouchStart = () => {
+        touched = true;
+        // Fast clean fill — no skew, faster than hover
+        gsap.to(hoverBg, { y: 0, duration: 0.2, ease: 'power2.out' });
+        gsap.to(title, { color: 'var(--color-bg)', duration: 0.2, ease: 'power2.out' });
+      };
+
+      const onTouchEnd = () => {
+        // Clear flag after short delay so mouse events work if user switches input
+        setTimeout(() => { touched = false; }, 300);
+      };
+
+      const onEnter = () => {
+        if (!touched) tl.play();
+      };
+      const onLeave = () => {
+        if (!touched) tl.reverse();
+      };
+
+      item.addEventListener('touchstart', onTouchStart, { passive: true });
+      item.addEventListener('touchend', onTouchEnd, { passive: true });
+      item.addEventListener('touchcancel', onTouchEnd, { passive: true });
       item.addEventListener('mouseenter', onEnter);
       item.addEventListener('mouseleave', onLeave);
 
       // Store cleanup function
       cleanupFunctions.push(() => {
         tl.kill();
+        item.removeEventListener('touchstart', onTouchStart);
+        item.removeEventListener('touchend', onTouchEnd);
+        item.removeEventListener('touchcancel', onTouchEnd);
         item.removeEventListener('mouseenter', onEnter);
         item.removeEventListener('mouseleave', onLeave);
       });

@@ -81,7 +81,7 @@ const filters = [
                 <a href={`/admin/events/${event.id}`}>{event.title}</a>
               </h3>
               <p class="event-venue text-sm text-muted">
-                {event.venue_name}{event.venue_address && `, ${event.venue_address}`}
+                {event.venue_name || ''}{event.venue_address && `, ${event.venue_address}`}
               </p>
             </div>
 

@@ -63,6 +63,13 @@
   }
 }
 
+/* Lenis smooth scroll */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+.lenis.lenis-scrolling iframe { pointer-events: none; }
+
 /* Reset */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -72,7 +79,6 @@
 
 html {
   font-size: 16px;
-  scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
@@ -443,6 +449,7 @@ button.accent-green:hover {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-bottom: calc(56px + var(--space-md) + var(--space-3xl));
 }
 
 .verb-item {

@@ -53,7 +53,7 @@ const isSoldOut = available !== null && available <= 0;
   <main class="door-checkout">
     <div class="checkout-card">
       <h1 class="event-title">{event.title}</h1>
-      <p class="event-venue text-muted">{event.venue_name}</p>
+      {event.venue_name && <p class="event-venue text-muted">{event.venue_name}</p>}
 
       {isSoldOut ? (
         <div class="sold-out-message">

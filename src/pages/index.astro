@@ -49,7 +49,7 @@ if (upcomingEvents.length > 0 && upcomingEvents[0].ticket_tiers) {
   <main>
     <VerbGrid events={events} isAuthenticated={!!user} featuredEventId={nextEventId} nextEventDate={nextEventDate} featuredTier={featuredTier} />
   </main>
-  <Footer nextEventDate={nextEventDate} />
+  <Footer />
   {featuredTier && <HouseRulesModal />}
 </Base>
 

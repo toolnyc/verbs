@@ -89,12 +89,12 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami/';
   }
 
   .noise-overlay.ready {
-    opacity: 0.05;
+    opacity: 0.045;
   }
 
   @media (max-width: 768px) {
     .noise-overlay.ready {
-      opacity: 0.03;
+      opacity: 0.027;
     }
   }
 
@@ -104,8 +104,8 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami/';
     inset: 0;
     pointer-events: none;
     z-index: 9998;
-    backdrop-filter: blur(0.44px);
-    -webkit-backdrop-filter: blur(0.44px);
+    backdrop-filter: blur(0.33px);
+    -webkit-backdrop-filter: blur(0.33px);
   }
 
   /* Disable effects on reduced motion preference */
@@ -121,11 +121,58 @@ const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://www.verbs.miami/';
 </style>
 
 <script>
+  import Lenis from 'lenis';
+  import { gsap } from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+  gsap.registerPlugin(ScrollTrigger);
+
   declare global {
     interface Window {
       _noiseInterval?: number;
+      _lenis?: InstanceType<typeof Lenis>;
+      _lenisTickerCallback?: (time: number) => void;
     }
   }
+
+  function initLenis() {
+    // Respect reduced motion preference
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    // Remove previous ticker callback and destroy instance
+    if (window._lenisTickerCallback) {
+      gsap.ticker.remove(window._lenisTickerCallback);
+      window._lenisTickerCallback = undefined;
+    }
+    if (window._lenis) {
+      window._lenis.destroy();
+      window._lenis = undefined;
+    }
+
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    });
+
+    window._lenis = lenis;
+
+    // Connect Lenis scroll to ScrollTrigger
+    lenis.on('scroll', ScrollTrigger.update);
+
+    // Connect to GSAP ticker for a shared RAF loop
+    const tickerCallback = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+    window._lenisTickerCallback = tickerCallback;
+    gsap.ticker.add(tickerCallback);
+    gsap.ticker.lagSmoothing(0);
+  }
+
+  // Initialize on first load
+  initLenis();
+
+  // Re-initialize after ViewTransitions
+  document.addEventListener('astro:page-load', initLenis);
 
   // Page transition handling with Astro ViewTransitions
   let transitionStartTime = 0;

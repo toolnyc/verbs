@@ -58,7 +58,7 @@ const displayAddress = formatDisplayAddress(event.venue_address);
     <div class="hero-content">
       <div class="hero-info">
         <div class="venue">
-          <p class="venue-name">{event.venue_name}</p>
+          {event.venue_name && <p class="venue-name">{event.venue_name}</p>}
           {displayAddress && <p class="venue-city text-muted">{displayAddress}</p>}
           {event.venue_link && (
             <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">

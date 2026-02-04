@@ -15,7 +15,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
     date: formData.get('date') as string,
     time_end: formData.get('time_end') as string || null,
     timezone: formData.get('timezone') as string || 'America/New_York',
-    venue_name: formData.get('venue_name') as string,
+    venue_name: formData.get('venue_name') as string || null,
     venue_address: formData.get('venue_address') as string || null,
     venue_link: formData.get('venue_link') as string || null,
     image_url: formData.get('flyer_url') as string || null,
@@ -94,8 +94,8 @@ if (Astro.request.method === 'POST' && supabaseAdmin) {
     </div>
 
     <div class="form-group">
-      <label for="venue_name" class="form-label">Venue Name *</label>
-      <input type="text" id="venue_name" name="venue_name" required />
+      <label for="venue_name" class="form-label">Venue Name</label>
+      <input type="text" id="venue_name" name="venue_name" />
     </div>
 
     <div class="form-group">

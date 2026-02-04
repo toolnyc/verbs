@@ -56,13 +56,10 @@ const timezoneAbbr = new Intl.DateTimeFormat('en-US', {
 
 const formattedYear = eventDate.getFullYear();
 
-// For countdown - use this event if it's in the future
-const nextEventDate = !isPast ? event.date : null;
-
 const displayAddress = formatDisplayAddress(event.venue_address);
 ---
 
-<Base title={`${event.title} - VERBS`} description={event.description || `${event.title} at ${event.venue_name}`}>
+<Base title={`${event.title} - VERBS`} description={event.description || `${event.title}${event.venue_name ? ` at ${event.venue_name}` : ''}`}>
   <main class="event-page">
     {isDraft && (
       <div class="draft-banner">
@@ -89,7 +86,7 @@ const displayAddress = formatDisplayAddress(event.venue_address);
 
         <div class="event-info">
           <div class="venue">
-            <p class="venue-name">{event.venue_name}</p>
+            {event.venue_name && <p class="venue-name">{event.venue_name}</p>}
             {displayAddress && <p class="venue-city text-muted">{displayAddress}</p>}
             {event.venue_link && (
               <a href={event.venue_link} target="_blank" rel="noopener" class="venue-link text-sm">
@@ -155,7 +152,7 @@ const displayAddress = formatDisplayAddress(event.venue_address);
 
     {!isPast && tiers.length > 0 && <HouseRulesModal />}
   </main>
-  <Footer nextEventDate={nextEventDate} />
+  <Footer />
 </Base>
 
 <style>

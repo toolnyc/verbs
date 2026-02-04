@@ -77,7 +77,7 @@ function getTotalRevenue(orders: any[]) {
         <div class="event-info">
           <h2 class="event-title">{currentEvent.title}</h2>
           <p class="event-meta">
-            {formatDate(currentEvent.date)} · {currentEvent.venue_name}{currentEvent.venue_address && `, ${currentEvent.venue_address}`}
+            {formatDate(currentEvent.date)}{currentEvent.venue_name && ` · ${currentEvent.venue_name}`}{currentEvent.venue_address && `, ${currentEvent.venue_address}`}
           </p>
         </div>
         <div class="event-actions">

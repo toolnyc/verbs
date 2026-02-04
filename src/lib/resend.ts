@@ -79,7 +79,7 @@ export async function sendTicketConfirmation({
   eventTitle: string;
   eventDate: Date;
   eventTimezone?: string;
-  venueName: string;
+  venueName: string | null;
   venueAddress: string | null;
   tierName: string;
   quantity: number;
@@ -177,7 +177,7 @@ export async function sendTicketConfirmation({
         </div>
         <div class="detail-row">
           <span class="label">Venue</span>
-          <span>${venueName}${venueAddress ? `, ${venueAddress}` : ''}</span>
+          <span>${venueName || ''}${venueAddress ? `${venueName ? ', ' : ''}${venueAddress}` : ''}</span>
         </div>
         <div class="detail-row">
           <span class="label">Ticket</span>
@@ -257,7 +257,7 @@ export async function sendWelcomeEmail({
     title: string;
     date: Date;
     timezone: string;
-    venueName: string;
+    venueName: string | null;
     venueAddress: string | null;
   } | null;
 }) {
@@ -289,7 +289,7 @@ export async function sendWelcomeEmail({
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Next Event</p>
         <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">${upcomingEvent.title}</p>
         <p style="margin: 0; color: #333;">${formattedDate} · ${formattedTime}</p>
-        <p style="margin: 4px 0 0 0; color: #666;">${upcomingEvent.venueName}${upcomingEvent.venueAddress ? `, ${upcomingEvent.venueAddress}` : ''}</p>
+        <p style="margin: 4px 0 0 0; color: #666;">${upcomingEvent.venueName || ''}${upcomingEvent.venueAddress ? `${upcomingEvent.venueName ? ', ' : ''}${upcomingEvent.venueAddress}` : ''}</p>
         <p style="margin: 16px 0 0 0;"><a href="${siteUrl}" style="color: #000;">Get tickets</a></p>
       </div>
     `;

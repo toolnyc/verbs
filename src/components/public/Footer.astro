@@ -1,13 +1,8 @@
 ---
 // Footer component - pinned at bottom, content scrolls beneath
-interface Props {
-  nextEventDate?: string | null;
-}
-
-const { nextEventDate } = Astro.props;
 ---
 
-<footer class="site-footer" data-next-event={nextEventDate || ''}>
+<footer class="site-footer">
   <!-- Desktop footer - expandable -->
   <div class="footer-desktop" id="footer-desktop">
     <!-- Main row: always visible -->
@@ -28,9 +23,13 @@ const { nextEventDate } = Astro.props;
       </a>
 
       <div class="footer-right">
-        <div class="footer-countdown">
-          <span class="countdown-label">Next party</span>
-          <span class="countdown-value" id="countdown-desktop">--</span>
+        <div class="footer-socials">
+          <a href="https://soundcloud.com/verbs-mia" target="_blank" rel="noopener noreferrer" aria-label="VERBS on SoundCloud">
+            <img src="/sc-logo.png" alt="SoundCloud" class="social-icon social-icon-sc" />
+          </a>
+          <a href="https://www.instagram.com/verbs.miami/" target="_blank" rel="noopener noreferrer" aria-label="VERBS on Instagram">
+            <img src="/ig-logo.webp" alt="Instagram" class="social-icon social-icon-invert" />
+          </a>
         </div>
         <button class="footer-expand-toggle" id="footer-expand-toggle" aria-label="Expand menu">
           <span class="expand-icon">+</span>
@@ -49,9 +48,13 @@ const { nextEventDate } = Astro.props;
   <!-- Mobile footer bar -->
   <div class="footer-bar footer-mobile">
     <button class="footer-menu-toggle" id="footer-menu-toggle">Menu</button>
-    <div class="footer-countdown">
-      <span class="countdown-label">Next party</span>
-      <span class="countdown-value" id="countdown-mobile">--</span>
+    <div class="footer-socials">
+      <a href="https://soundcloud.com/verbs-mia" target="_blank" rel="noopener noreferrer" aria-label="VERBS on SoundCloud">
+        <img src="/sc-logo.png" alt="SoundCloud" class="social-icon social-icon-sc" />
+      </a>
+      <a href="https://www.instagram.com/verbs.miami/" target="_blank" rel="noopener noreferrer" aria-label="VERBS on Instagram">
+        <img src="/ig-logo.webp" alt="Instagram" class="social-icon social-icon-invert" />
+      </a>
     </div>
   </div>
 </footer>
@@ -69,80 +72,22 @@ const { nextEventDate } = Astro.props;
     <button type="submit">Subscribe</button>
     <span class="newsletter-status"></span>
   </form>
-  <div class="footer-countdown-overlay">
-    <span class="countdown-label">Next party</span>
-    <span class="countdown-value" id="countdown-overlay">--</span>
+  <div class="footer-socials-overlay">
+    <a href="https://soundcloud.com/verbs-mia" target="_blank" rel="noopener noreferrer" aria-label="VERBS on SoundCloud">
+      <img src="/sc-logo.png" alt="SoundCloud" class="social-icon social-icon-sc" />
+    </a>
+    <a href="https://www.instagram.com/verbs.miami/" target="_blank" rel="noopener noreferrer" aria-label="VERBS on Instagram">
+      <img src="/ig-logo.webp" alt="Instagram" class="social-icon social-icon-invert" />
+    </a>
   </div>
 </div>
 
 <script>
-  // Use window to persist interval across ViewTransitions
+  // Use window to persist state across ViewTransitions
   declare global {
     interface Window {
-      _countdownInterval?: number;
       __footerListenersAdded?: boolean;
     }
-  }
-
-  function updateCountdown() {
-    const footer = document.querySelector('.site-footer') as HTMLElement;
-    const nextEventDate = footer?.dataset.nextEvent;
-
-    const elements = document.querySelectorAll('#countdown-desktop, #countdown-mobile, #countdown-overlay');
-
-    if (!nextEventDate) {
-      elements.forEach(el => {
-        if (el) el.textContent = 'TBA';
-      });
-      return;
-    }
-
-    const now = new Date();
-    const eventDate = new Date(nextEventDate);
-    const diff = eventDate.getTime() - now.getTime();
-
-    if (isNaN(diff)) {
-      elements.forEach(el => {
-        if (el) el.textContent = 'TBA';
-      });
-      return;
-    }
-
-    if (diff <= 0) {
-      elements.forEach(el => {
-        if (el) el.textContent = 'Now!';
-      });
-      return;
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    let countdownText = '';
-    if (days > 0) {
-      countdownText = `${days}d ${hours}h ${minutes}m`;
-    } else if (hours > 0) {
-      countdownText = `${hours}h ${minutes}m ${seconds}s`;
-    } else {
-      countdownText = `${minutes}m ${seconds}s`;
-    }
-
-    elements.forEach(el => {
-      if (el) el.textContent = countdownText;
-    });
-  }
-
-  function initCountdown() {
-    // Clear any existing interval
-    if (window._countdownInterval) {
-      clearInterval(window._countdownInterval);
-    }
-
-    // Update immediately and then every second
-    updateCountdown();
-    window._countdownInterval = window.setInterval(updateCountdown, 1000);
   }
 
   // Event delegation click handler for footer interactions
@@ -161,6 +106,7 @@ const { nextEventDate } = Astro.props;
       const menuOverlay = document.getElementById('footer-menu-overlay');
       menuOverlay?.classList.add('open');
       document.body.style.overflow = 'hidden';
+      window._lenis?.stop();
       return;
     }
 
@@ -169,6 +115,7 @@ const { nextEventDate } = Astro.props;
       const menuOverlay = document.getElementById('footer-menu-overlay');
       menuOverlay?.classList.remove('open');
       document.body.style.overflow = '';
+      window._lenis?.start();
       return;
     }
 
@@ -178,6 +125,7 @@ const { nextEventDate } = Astro.props;
       const menuOverlay = document.getElementById('footer-menu-overlay');
       menuOverlay?.classList.remove('open');
       document.body.style.overflow = '';
+      window._lenis?.start();
       return;
     }
   }
@@ -220,12 +168,6 @@ const { nextEventDate } = Astro.props;
     submitBtn.disabled = false;
     setTimeout(() => { statusEl.textContent = ''; }, 3000);
   }
-
-  // Initialize countdown
-  initCountdown();
-
-  // Re-initialize countdown after ViewTransitions
-  document.addEventListener('astro:page-load', initCountdown);
 
   // Only add event delegation listeners once
   if (!window.__footerListenersAdded) {
@@ -352,22 +294,41 @@ const { nextEventDate } = Astro.props;
   .footer-right {
     display: flex;
     align-items: center;
-    gap: var(--space-lg);
+    gap: var(--space-xl);
   }
 
-  .footer-countdown {
+  .footer-socials {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    font-size: var(--text-base);
+    gap: var(--space-md);
   }
 
-  .countdown-label {
-    opacity: 0.6;
+  .footer-socials a {
+    display: flex;
+    align-items: center;
+    opacity: 0.8;
+    transition: opacity 0.2s;
   }
 
-  .countdown-value {
-    font-variant-numeric: tabular-nums;
+  .footer-socials a:hover {
+    opacity: 1;
+  }
+
+  .footer-socials a::after {
+    display: none;
+  }
+
+  .social-icon {
+    height: 26px;
+    width: auto;
+  }
+
+  .social-icon-sc {
+    height: 32px;
+  }
+
+  .social-icon-invert {
+    filter: invert(1);
   }
 
   /* Desktop expand toggle */
@@ -498,17 +459,36 @@ const { nextEventDate } = Astro.props;
     opacity: 1;
   }
 
-  .footer-countdown-overlay {
+  .footer-socials-overlay {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    font-size: var(--text-sm);
+    gap: var(--space-lg);
     padding-top: var(--space-xl);
     border-top: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  .footer-countdown-overlay .countdown-label {
-    opacity: 0.6;
+  .footer-socials-overlay a {
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .footer-socials-overlay a:hover {
+    opacity: 1;
+  }
+
+  .footer-socials-overlay a::after {
+    display: none;
+  }
+
+  .footer-socials-overlay .social-icon {
+    height: 28px;
+    width: auto;
+  }
+
+  .footer-socials-overlay .social-icon-sc {
+    height: 35px;
   }
 
   .newsletter-form-overlay {

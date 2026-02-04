@@ -48,7 +48,7 @@ const displayAddress = formatDisplayAddress(event.venue_address);
   <div class="event-details">
     <h3 class="event-title">{event.title}</h3>
     <p class="event-meta text-sm text-muted">
-      {event.venue_name} · {formattedTime}
+      {event.venue_name ? `${event.venue_name} · ` : ''}{formattedTime}
     </p>
     {displayAddress && <p class="event-city text-xs text-muted">{displayAddress}</p>}
   </div>

@@ -86,8 +86,8 @@ export function showPreview(element: HTMLElement) {
   gsap.killTweensOf(element);
   gsap.fromTo(
     element,
-    { opacity: 0, scale: 0.9 },
-    { opacity: 1, scale: 1, duration: duration.normal, ease: easing.snappy }
+    { opacity: 0, scale: 0.95 },
+    { opacity: 1, scale: 1, duration: 0.45, ease: easing.smooth }
   );
 }
 
@@ -98,8 +98,8 @@ export function hidePreview(element: HTMLElement) {
   gsap.killTweensOf(element);
   gsap.to(element, {
     opacity: 0,
-    scale: 0.9,
-    duration: duration.fast,
+    scale: 0.95,
+    duration: duration.normal,
     ease: easing.smooth,
   });
 }
@@ -161,19 +161,28 @@ export function hoverScale(element: HTMLElement, isHovering: boolean) {
 export function createHoverPreview(
   trigger: HTMLElement,
   preview: HTMLElement,
-  options: { offset?: number } = {}
+  options: { offset?: number; delay?: number } = {}
 ): () => void {
-  const { offset = 20 } = options;
+  const { offset = 20, delay = 180 } = options;
   let isVisible = false;
+  let hoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   const onEnter = () => {
-    isVisible = true;
-    showPreview(preview);
+    hoverTimer = setTimeout(() => {
+      isVisible = true;
+      showPreview(preview);
+    }, delay);
   };
 
   const onLeave = () => {
-    isVisible = false;
-    hidePreview(preview);
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+    if (isVisible) {
+      isVisible = false;
+      hidePreview(preview);
+    }
   };
 
   const onMove = (e: MouseEvent) => {
@@ -207,6 +216,7 @@ export function createHoverPreview(
 
   // Return cleanup function
   return () => {
+    if (hoverTimer) clearTimeout(hoverTimer);
     trigger.removeEventListener('mouseenter', onEnter);
     trigger.removeEventListener('mouseleave', onLeave);
     trigger.removeEventListener('mousemove', onMove);

@@ -30,7 +30,7 @@ export interface Event {
   date: string;
   time_end: string | null;
   timezone: string;
-  venue_name: string;
+  venue_name: string | null;
   venue_address: string | null;
   venue_link: string | null;
   image_url: string | null;
