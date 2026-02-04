@@ -156,6 +156,7 @@ export function hoverScale(element: HTMLElement, isHovering: boolean) {
 
 /**
  * Create a hover preview controller for an element
+ * Uses gsap.quickTo() for smooth, interpolated cursor-following via transforms
  * Returns cleanup function
  */
 export function createHoverPreview(
@@ -166,11 +167,57 @@ export function createHoverPreview(
   const { offset = 20, delay = 180 } = options;
   let isVisible = false;
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentX = 0;
+  let currentY = 0;
+  let previewWidth = 0;
+  let previewHeight = 0;
 
-  const onEnter = () => {
+  // quickTo creates reusable tweens — much faster than gsap.to() per frame
+  // and provides smooth interpolation between positions
+  const xTo = gsap.quickTo(preview, 'x', { duration: 0.35, ease: 'power3.out' });
+  const yTo = gsap.quickTo(preview, 'y', { duration: 0.35, ease: 'power3.out' });
+
+  function calcPosition(clientX: number, clientY: number) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let x = clientX + offset;
+    let y = clientY + offset;
+
+    if (x + previewWidth > vw) {
+      x = clientX - previewWidth - offset;
+    }
+    if (y + previewHeight > vh) {
+      y = vh - previewHeight - offset;
+    }
+    if (y < offset) {
+      y = offset;
+    }
+
+    return { x, y };
+  }
+
+  const onEnter = (e: MouseEvent) => {
+    currentX = e.clientX;
+    currentY = e.clientY;
+
     hoverTimer = setTimeout(() => {
+      // Cache dimensions once on show (avoids reflow on every mousemove)
+      const rect = preview.getBoundingClientRect();
+      previewWidth = rect.width;
+      previewHeight = rect.height;
+
+      // Snap to current mouse position instantly before fading in
+      const pos = calcPosition(currentX, currentY);
+      gsap.set(preview, { x: pos.x, y: pos.y });
+
       isVisible = true;
-      showPreview(preview);
+      // Inline show — avoids killTweensOf which would nuke quickTo tweens
+      gsap.fromTo(
+        preview,
+        { opacity: 0, scale: 0.95 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: easing.smooth }
+      );
     }, delay);
   };
 
@@ -181,40 +228,30 @@ export function createHoverPreview(
     }
     if (isVisible) {
       isVisible = false;
-      hidePreview(preview);
+      gsap.to(preview, {
+        opacity: 0,
+        scale: 0.95,
+        duration: duration.normal,
+        ease: easing.smooth,
+      });
     }
   };
 
   const onMove = (e: MouseEvent) => {
+    currentX = e.clientX;
+    currentY = e.clientY;
+
     if (!isVisible) return;
 
-    const previewRect = preview.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    let x = e.clientX + offset;
-    let y = e.clientY + offset;
-
-    // Keep preview within viewport bounds
-    if (x + previewRect.width > viewportWidth) {
-      x = e.clientX - previewRect.width - offset;
-    }
-    if (y + previewRect.height > viewportHeight) {
-      y = viewportHeight - previewRect.height - offset;
-    }
-    if (y < offset) {
-      y = offset;
-    }
-
-    // Use left/top for fixed positioning
-    gsap.set(preview, { left: x, top: y });
+    const pos = calcPosition(currentX, currentY);
+    xTo(pos.x);
+    yTo(pos.y);
   };
 
   trigger.addEventListener('mouseenter', onEnter);
   trigger.addEventListener('mouseleave', onLeave);
   trigger.addEventListener('mousemove', onMove);
 
-  // Return cleanup function
   return () => {
     if (hoverTimer) clearTimeout(hoverTimer);
     trigger.removeEventListener('mouseenter', onEnter);
