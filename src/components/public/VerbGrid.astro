@@ -189,10 +189,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
 
 <script>
   import gsap from 'gsap';
-  import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { createHoverPreview } from '../../lib/animations';
-
-  gsap.registerPlugin(ScrollTrigger);
 
   // Store cleanup functions for re-initialization
   const cleanupFunctions: (() => void)[] = [];
@@ -225,27 +222,33 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
       }
 
       // --- Scroll-triggered entrance animation ---
+      // Uses IntersectionObserver instead of ScrollTrigger to avoid conflicts
+      // with content-visibility: auto on .verb-item, which causes ScrollTrigger
+      // to miscalculate positions for off-screen items (leaving them at opacity 0).
       if (!prefersReducedMotion && !item.classList.contains('featured')) {
         gsap.set(item, { opacity: 0, y: 30 });
 
-        const st = ScrollTrigger.create({
-          trigger: item,
-          start: 'top 90%',
-          once: true,
-          onEnter: () => {
-            // Cap delay so items already in viewport appear immediately
-            const delay = Math.min(index * 0.04, 0.2);
-            gsap.to(item, {
-              opacity: 1,
-              y: 0,
-              duration: 0.6,
-              delay,
-              ease: 'power2.out',
-            });
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                const delay = Math.min(index * 0.04, 0.2);
+                gsap.to(item, {
+                  opacity: 1,
+                  y: 0,
+                  duration: 0.6,
+                  delay,
+                  ease: 'power2.out',
+                });
+                observer.disconnect();
+              }
+            }
           },
-        });
+          { rootMargin: '0px 0px 50px 0px' }
+        );
 
-        cleanupFunctions.push(() => st.kill());
+        observer.observe(item);
+        cleanupFunctions.push(() => observer.disconnect());
       }
 
       // Only add hover/tap animation to clickable items
@@ -294,8 +297,22 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
         gsap.to(title, { color: 'var(--color-bg)', duration: 0.2, ease: 'power2.out' });
       };
 
+      const resetTouchHover = (immediate: boolean) => {
+        const delay = immediate ? 0 : 0.15;
+        gsap.to(hoverBg, { y: '100%', duration: 0.3, delay, ease: 'power2.in' });
+        gsap.to(title, { color: 'var(--color-fg)', duration: 0.3, delay, ease: 'power2.in' });
+      };
+
       const onTouchEnd = () => {
-        // Clear flag after short delay so mouse events work if user switches input
+        // Brief visual feedback flash, then reverse
+        resetTouchHover(false);
+        // Block emulated mouse events from re-triggering the timeline
+        setTimeout(() => { touched = false; }, 300);
+      };
+
+      const onTouchCancel = () => {
+        // User started scrolling — reverse immediately
+        resetTouchHover(true);
         setTimeout(() => { touched = false; }, 300);
       };
 
@@ -308,7 +325,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
 
       item.addEventListener('touchstart', onTouchStart, { passive: true });
       item.addEventListener('touchend', onTouchEnd, { passive: true });
-      item.addEventListener('touchcancel', onTouchEnd, { passive: true });
+      item.addEventListener('touchcancel', onTouchCancel, { passive: true });
       item.addEventListener('mouseenter', onEnter);
       item.addEventListener('mouseleave', onLeave);
 
@@ -317,7 +334,7 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
         tl.kill();
         item.removeEventListener('touchstart', onTouchStart);
         item.removeEventListener('touchend', onTouchEnd);
-        item.removeEventListener('touchcancel', onTouchEnd);
+        item.removeEventListener('touchcancel', onTouchCancel);
         item.removeEventListener('mouseenter', onEnter);
         item.removeEventListener('mouseleave', onLeave);
       });
