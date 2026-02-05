@@ -202,6 +202,9 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
     cleanupFunctions.forEach(cleanup => cleanup());
     cleanupFunctions.length = 0;
 
+    // Remove any orphaned previews left on document.body from previous page
+    document.querySelectorAll('body > .flyer-preview').forEach(el => el.remove());
+
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Initialize hover previews and animated backgrounds for verb items
@@ -215,7 +218,8 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
         const cleanup = createHoverPreview(item as HTMLElement, preview);
         cleanupFunctions.push(() => {
           cleanup();
-          // Move back into item so next init can find it (idempotent re-init)
+          // Move back into item so next init can find it
+          // (if item is detached after a ViewTransition, orphan cleanup handles it)
           item.appendChild(preview);
         });
       }
@@ -383,5 +387,14 @@ const featuredAvailable = featuredTier && featuredTier.max_stock !== null
   document.addEventListener('astro:page-load', () => {
     initVerbGridAnimations();
     initFeaturedCountdown();
+  });
+
+  // Immediately hide all previews when navigation starts
+  // (mouseleave won't fire if the DOM is removed mid-hover)
+  document.addEventListener('astro:before-preparation', () => {
+    document.querySelectorAll('body > .flyer-preview').forEach(el => {
+      gsap.killTweensOf(el);
+      gsap.set(el, { opacity: 0 });
+    });
   });
 </script>

@@ -212,16 +212,15 @@ export function createHoverPreview(
       gsap.set(preview, { x: pos.x, y: pos.y });
 
       isVisible = true;
-      // Inline show — avoids killTweensOf which would nuke quickTo tweens
       gsap.fromTo(
         preview,
         { opacity: 0, scale: 0.95 },
-        { opacity: 1, scale: 1, duration: 0.45, ease: easing.smooth }
+        { opacity: 1, scale: 1, duration: 0.45, ease: easing.smooth, overwrite: 'auto' }
       );
     }, delay);
   };
 
-  const onLeave = () => {
+  const hide = () => {
     if (hoverTimer) {
       clearTimeout(hoverTimer);
       hoverTimer = null;
@@ -233,7 +232,23 @@ export function createHoverPreview(
         scale: 0.95,
         duration: duration.normal,
         ease: easing.smooth,
+        overwrite: 'auto',
       });
+    }
+  };
+
+  const onLeave = hide;
+
+  // Browsers don't reliably fire mouseleave when elements scroll away
+  // from the cursor, so hide on scroll as well
+  const onScroll = () => {
+    if (!isVisible && !hoverTimer) return;
+    const rect = trigger.getBoundingClientRect();
+    if (
+      currentX < rect.left || currentX > rect.right ||
+      currentY < rect.top || currentY > rect.bottom
+    ) {
+      hide();
     }
   };
 
@@ -251,11 +266,16 @@ export function createHoverPreview(
   trigger.addEventListener('mouseenter', onEnter);
   trigger.addEventListener('mouseleave', onLeave);
   trigger.addEventListener('mousemove', onMove);
+  window.addEventListener('scroll', onScroll, { passive: true });
 
   return () => {
     if (hoverTimer) clearTimeout(hoverTimer);
     trigger.removeEventListener('mouseenter', onEnter);
     trigger.removeEventListener('mouseleave', onLeave);
     trigger.removeEventListener('mousemove', onMove);
+    window.removeEventListener('scroll', onScroll);
+    gsap.killTweensOf(preview);
+    gsap.set(preview, { opacity: 0 });
+    isVisible = false;
   };
 }

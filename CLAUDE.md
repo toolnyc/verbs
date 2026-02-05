@@ -77,3 +77,13 @@ Reference 2: https://body-without-organs.netlify.app/
 - Like the hover effects
 
 Current site design: https://www.verbsaroundthe.world/
+
+### Hover Flyer Previews — Known Pitfalls
+
+The cursor-following flyer preview system (`src/lib/animations.ts` `createHoverPreview` + `VerbGrid.astro`) has three interacting systems that can cause subtle bugs: **Lenis smooth scroll**, **GSAP tweens**, and **Astro ViewTransitions**. Key lessons from past debugging:
+
+**Lenis + scroll listeners**: Lenis smooth scroll fires the native `window.scroll` event on every animation frame for ~1.2s after user input. Any scroll-based hide logic must not blindly hide on every scroll event — it needs to check whether the cursor is actually outside the trigger's bounding rect, otherwise flyers can never appear while Lenis is animating.
+
+**GSAP tween races (overwrite: 'auto')**: The show tween (0.45s `fromTo`) and hide tween (0.3s `to`) target the same properties (opacity, scale) on the same element. GSAP 3 defaults to `overwrite: false`, meaning both tweens run simultaneously. If `hide()` is called during the show animation, the hide tween finishes first (0.3s < 0.45s), and the show tween's remaining frames push opacity back up — creating an orphaned visible flyer with `isVisible = false` (so `hide()` becomes a no-op). Fix: use `overwrite: 'auto'` on both tweens so each kills the other's overlapping properties without nuking the `quickTo` x/y tweens.
+
+**ViewTransition cleanup**: Flyer previews are reparented from `.verb-item` to `document.body` for correct fixed positioning. On navigation, `astro:before-preparation` force-hides all `body > .flyer-preview` elements, and `initVerbGridAnimations` removes orphans on re-init. The cleanup function moves previews back into their items so the next init cycle can find them.
