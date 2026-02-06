@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Fetch ticket tier
     const { data: tier, error: tierError } = await supabaseAdmin
       .from('ticket_tiers')
-      .select('*, event:events(*)')
+      .select('*, event:events!ticket_tiers_event_id_fkey(*)')
       .eq('id', ticket_tier_id)
       .single();
 

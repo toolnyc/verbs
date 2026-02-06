@@ -8,7 +8,7 @@ let error = '';
 // Fetch ticket tiers with events for product restrictions
 const { data: tiers } = await supabaseAdmin
   .from('ticket_tiers')
-  .select('id, name, stripe_product_id, event:events(id, title, status)')
+  .select('id, name, stripe_product_id, event:events!ticket_tiers_event_id_fkey(id, title, status)')
   .not('stripe_product_id', 'is', null)
   .eq('is_active', true)
   .order('event_id');

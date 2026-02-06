@@ -38,7 +38,7 @@ try {
 // Fetch all tiers with stripe_product_id for mapping restrictions to human-readable names
 const { data: allTiers } = await supabaseAdmin
   .from('ticket_tiers')
-  .select('stripe_product_id, name, event:events(title)')
+  .select('stripe_product_id, name, event:events!ticket_tiers_event_id_fkey(title)')
   .not('stripe_product_id', 'is', null);
 
 const productIdToTier = new Map(

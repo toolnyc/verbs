@@ -131,12 +131,22 @@ Example: Adding `events.door_tier_id` → `ticket_tiers.id` created a second FK 
 
 **Before** (ambiguous, breaks):
 ```typescript
+// From events table
 .select(`*, ticket_tiers (*)`)
+
+// From ticket_tiers table
+.select(`*, event:events(*)`)
 ```
 
 **After** (explicit FK, works):
 ```typescript
+// From events table
 .select(`*, ticket_tiers!ticket_tiers_event_id_fkey (*)`)
+
+// From ticket_tiers table
+.select(`*, event:events!ticket_tiers_event_id_fkey(*)`)
 ```
+
+The FK name `ticket_tiers_event_id_fkey` refers to the constraint on `ticket_tiers.event_id` → `events.id`. Use this same FK name regardless of which table you're querying from.
 
 Always test queries locally after adding FKs that reference tables already linked by other FKs. The dev server console will show the PGRST201 error with hints about which FK names to use.

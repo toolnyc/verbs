@@ -35,7 +35,7 @@ export const PATCH: APIRoute = async ({ params, request, cookies }) => {
     // Fetch current tier
     const { data: currentTier, error: fetchError } = await supabaseAdmin
       .from('ticket_tiers')
-      .select('*, event:events(title)')
+      .select('*, event:events!ticket_tiers_event_id_fkey(title)')
       .eq('id', tierId)
       .single();
 
