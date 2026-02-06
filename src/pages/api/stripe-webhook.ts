@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
-import { verifyWebhookSignature, stripe } from '../../lib/stripe';
+import { verifyWebhookSignature, stripe, getPromotionCodeDetails } from '../../lib/stripe';
 import { sendTicketConfirmation } from '../../lib/resend';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -39,6 +39,24 @@ export const POST: APIRoute = async ({ request }) => {
         return new Response('Missing metadata', { status: 400 });
       }
 
+      // Extract discount info from session
+      const discountAmount = session.total_details?.amount_discount
+        ? session.total_details.amount_discount / 100
+        : 0;
+
+      let discountCode: string | null = null;
+      if (session.discounts && session.discounts.length > 0) {
+        const promoCodeId = session.discounts[0]?.promotion_code;
+        if (promoCodeId && typeof promoCodeId === 'string') {
+          try {
+            const promoDetails = await getPromotionCodeDetails(promoCodeId);
+            discountCode = promoDetails.code;
+          } catch (e) {
+            console.error('Failed to fetch promo code details:', e);
+          }
+        }
+      }
+
       // Insert order (idempotent on stripe_session_id)
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from('orders')
@@ -52,6 +70,8 @@ export const POST: APIRoute = async ({ request }) => {
             customer_name: session.customer_details?.name,
             quantity,
             amount_paid: session.amount_total / 100, // Convert from cents
+            discount_amount: discountAmount,
+            discount_code: discountCode,
             status: 'completed',
           },
           {

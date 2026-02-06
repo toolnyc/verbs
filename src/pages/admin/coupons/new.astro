@@ -1,0 +1,189 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { createCoupon, createPromotionCode } from '../../../lib/stripe';
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+
+  const name = formData.get('name') as string;
+  const discountType = formData.get('discount_type') as 'percent' | 'amount';
+  const discountValue = parseFloat(formData.get('discount_value') as string);
+  const maxRedemptions = formData.get('max_redemptions') as string;
+  const expiresAt = formData.get('expires_at') as string;
+  const promoCode = formData.get('promo_code') as string;
+  const promoMaxRedemptions = formData.get('promo_max_redemptions') as string;
+
+  try {
+    // Create the coupon
+    const coupon = await createCoupon({
+      name,
+      discountType,
+      discountValue,
+      maxRedemptions: maxRedemptions ? parseInt(maxRedemptions, 10) : undefined,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    });
+
+    // Create the promotion code if provided
+    if (promoCode) {
+      await createPromotionCode({
+        couponId: coupon.id,
+        code: promoCode,
+        maxRedemptions: promoMaxRedemptions ? parseInt(promoMaxRedemptions, 10) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      });
+    }
+
+    return Astro.redirect('/admin/coupons');
+  } catch (e: any) {
+    error = e.message;
+  }
+}
+---
+
+<Admin title="New Coupon">
+  <form method="POST" class="admin-form">
+    {error && <p class="error-message mb-lg">{error}</p>}
+
+    <div class="form-section">
+      <h2 class="form-section-title">Coupon Details</h2>
+
+      <div class="form-group">
+        <label for="name" class="form-label">Coupon Name *</label>
+        <input type="text" id="name" name="name" required placeholder="e.g., Summer Sale 2024" />
+        <p class="form-hint">Internal name for reference (shown in Stripe dashboard)</p>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="discount_type" class="form-label">Discount Type *</label>
+          <select id="discount_type" name="discount_type" required>
+            <option value="percent">Percentage</option>
+            <option value="amount">Fixed Amount</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="discount_value" class="form-label">Discount Value *</label>
+          <input
+            type="number"
+            id="discount_value"
+            name="discount_value"
+            required
+            min="1"
+            step="any"
+            placeholder="e.g., 20"
+          />
+          <p class="form-hint" id="discount-hint">Enter percentage (e.g., 20 for 20% off)</p>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="max_redemptions" class="form-label">Max Redemptions</label>
+          <input type="number" id="max_redemptions" name="max_redemptions" min="1" placeholder="Unlimited" />
+          <p class="form-hint">Total uses across all promotion codes</p>
+        </div>
+
+        <div class="form-group">
+          <label for="expires_at" class="form-label">Expiration Date</label>
+          <input type="date" id="expires_at" name="expires_at" />
+          <p class="form-hint">Leave blank for no expiration</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2 class="form-section-title">Promotion Code</h2>
+      <p class="form-section-desc">The code customers will enter at checkout</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="promo_code" class="form-label">Code</label>
+          <input
+            type="text"
+            id="promo_code"
+            name="promo_code"
+            placeholder="e.g., SUMMER20"
+            pattern="[A-Za-z0-9]+"
+            title="Letters and numbers only"
+          />
+          <p class="form-hint">Will be converted to uppercase</p>
+        </div>
+
+        <div class="form-group">
+          <label for="promo_max_redemptions" class="form-label">Max Uses</label>
+          <input type="number" id="promo_max_redemptions" name="promo_max_redemptions" min="1" placeholder="Unlimited" />
+          <p class="form-hint">Limit for this specific code</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="/admin/coupons" class="secondary">Cancel</a>
+      <button type="submit">Create Coupon</button>
+    </div>
+  </form>
+</Admin>
+
+<script>
+  const discountType = document.getElementById('discount_type') as HTMLSelectElement;
+  const discountValue = document.getElementById('discount_value') as HTMLInputElement;
+  const discountHint = document.getElementById('discount-hint') as HTMLParagraphElement;
+
+  function updateHint() {
+    if (discountType.value === 'percent') {
+      discountHint.textContent = 'Enter percentage (e.g., 20 for 20% off)';
+      discountValue.max = '100';
+    } else {
+      discountHint.textContent = 'Enter amount in dollars (e.g., 10 for $10 off)';
+      discountValue.removeAttribute('max');
+    }
+  }
+
+  discountType?.addEventListener('change', updateHint);
+</script>
+
+<style>
+  .form-section {
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+  }
+
+  .form-section-title {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+  }
+
+  .form-section-desc {
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+    margin-bottom: var(--space-lg);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 640px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+  }
+</style>

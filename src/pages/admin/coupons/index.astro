@@ -1,0 +1,276 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import { listCouponsWithPromoCodes, deleteCoupon, deactivatePromotionCode } from '../../../lib/stripe';
+
+let coupons: any[] = [];
+let error = '';
+
+// Handle POST actions
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  try {
+    if (action === 'delete_coupon') {
+      const couponId = formData.get('coupon_id') as string;
+      await deleteCoupon(couponId);
+      return Astro.redirect('/admin/coupons');
+    }
+
+    if (action === 'deactivate_promo') {
+      const promoId = formData.get('promo_id') as string;
+      await deactivatePromotionCode(promoId);
+      return Astro.redirect('/admin/coupons');
+    }
+  } catch (e: any) {
+    error = e.message;
+  }
+}
+
+// Fetch coupons
+try {
+  coupons = await listCouponsWithPromoCodes();
+} catch (e: any) {
+  error = e.message;
+}
+
+function formatDiscount(coupon: any) {
+  if (coupon.percent_off) {
+    return `${coupon.percent_off}% off`;
+  }
+  if (coupon.amount_off) {
+    return `$${(coupon.amount_off / 100).toFixed(2)} off`;
+  }
+  return 'Unknown';
+}
+
+function formatDate(timestamp: number | null) {
+  if (!timestamp) return 'Never';
+  return new Date(timestamp * 1000).toLocaleDateString();
+}
+---
+
+<Admin title="Coupons">
+  {error && <p class="error-message mb-lg">{error}</p>}
+
+  <div class="page-actions">
+    <div class="coupon-count text-muted">
+      {coupons.length} coupon{coupons.length !== 1 ? 's' : ''}
+    </div>
+    <a href="/admin/coupons/new" class="btn-primary">New Coupon</a>
+  </div>
+
+  {coupons.length > 0 ? (
+    <div class="coupons-list">
+      {coupons.map(coupon => (
+        <div class="coupon-card">
+          <div class="coupon-header">
+            <div class="coupon-info">
+              <h3 class="coupon-name">{coupon.name}</h3>
+              <span class="coupon-discount">{formatDiscount(coupon)}</span>
+              {!coupon.valid && <span class="status-badge archived">Invalid</span>}
+            </div>
+            <div class="coupon-stats text-sm text-muted">
+              <span>Used: {coupon.times_redeemed || 0}{coupon.max_redemptions ? ` / ${coupon.max_redemptions}` : ''}</span>
+              {coupon.redeem_by && (
+                <span>Expires: {formatDate(coupon.redeem_by)}</span>
+              )}
+            </div>
+          </div>
+
+          {coupon.promotion_codes.length > 0 && (
+            <div class="promo-codes">
+              <div class="promo-codes-header">Promotion Codes</div>
+              {coupon.promotion_codes.map((promo: any) => (
+                <div class="promo-row">
+                  <code class="promo-code">{promo.code}</code>
+                  <span class={`status-badge ${promo.active ? 'published' : 'archived'}`}>
+                    {promo.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span class="text-sm text-muted">
+                    Used: {promo.times_redeemed || 0}{promo.max_redemptions ? ` / ${promo.max_redemptions}` : ''}
+                  </span>
+                  {promo.active && (
+                    <form method="POST" class="inline-form">
+                      <input type="hidden" name="action" value="deactivate_promo" />
+                      <input type="hidden" name="promo_id" value={promo.id} />
+                      <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Deactivate this promotion code?')">
+                        Deactivate
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {coupon.promotion_codes.length === 0 && (
+            <p class="no-promos text-sm text-muted">No promotion codes</p>
+          )}
+
+          <div class="coupon-actions">
+            <form method="POST" class="inline-form">
+              <input type="hidden" name="action" value="delete_coupon" />
+              <input type="hidden" name="coupon_id" value={coupon.id} />
+              <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this coupon and all its promotion codes?')">
+                Delete Coupon
+              </button>
+            </form>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div class="empty-state">
+      <p class="text-muted">No coupons yet</p>
+      <a href="/admin/coupons/new" class="mt-md">Create your first coupon</a>
+    </div>
+  )}
+</Admin>
+
+<style>
+  .page-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    gap: var(--space-md);
+  }
+
+  .btn-primary {
+    display: inline-block;
+    padding: var(--space-sm) var(--space-lg);
+    background: var(--color-fg);
+    color: var(--color-bg);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: var(--text-sm);
+  }
+
+  .btn-primary::after {
+    display: none;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .coupons-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .coupon-card {
+    background: var(--color-bg);
+    padding: var(--space-lg);
+  }
+
+  .coupon-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .coupon-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .coupon-name {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .coupon-discount {
+    background: var(--color-bg-alt);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .coupon-stats {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .promo-codes {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .promo-codes-header {
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+    font-weight: 500;
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .promo-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+    flex-wrap: wrap;
+  }
+
+  .promo-code {
+    font-family: monospace;
+    font-size: var(--text-sm);
+    background: var(--color-bg-alt);
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .no-promos {
+    margin: var(--space-md) 0;
+  }
+
+  .coupon-actions {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-md);
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .inline-form {
+    display: inline;
+  }
+
+  .empty-state {
+    background: var(--color-bg);
+    padding: var(--space-3xl);
+    text-align: center;
+  }
+
+  .error-message {
+    background: #fce8e6;
+    color: #c5221f;
+    padding: var(--space-md);
+  }
+
+  @media (max-width: 768px) {
+    .coupon-header {
+      flex-direction: column;
+    }
+
+    .coupon-stats {
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .promo-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-sm);
+    }
+  }
+</style>

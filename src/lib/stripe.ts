@@ -35,6 +35,7 @@ export async function createCheckoutSession({
         quantity,
       },
     ],
+    allow_promotion_codes: true,
     customer_email: customerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,
@@ -203,4 +204,100 @@ export function verifyWebhookSignature(
   }
 
   return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+}
+
+// ============ Coupon Functions ============
+
+export async function createCoupon(params: {
+  name: string;
+  discountType: 'percent' | 'amount';
+  discountValue: number;
+  maxRedemptions?: number;
+  expiresAt?: Date;
+}) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  const couponParams: Stripe.CouponCreateParams = {
+    name: params.name,
+    ...(params.discountType === 'percent'
+      ? { percent_off: params.discountValue }
+      : { amount_off: Math.round(params.discountValue * 100), currency: 'usd' }),
+    ...(params.maxRedemptions && { max_redemptions: params.maxRedemptions }),
+    ...(params.expiresAt && { redeem_by: Math.floor(params.expiresAt.getTime() / 1000) }),
+  };
+
+  return stripe.coupons.create(couponParams);
+}
+
+export async function createPromotionCode(params: {
+  couponId: string;
+  code: string;
+  maxRedemptions?: number;
+  expiresAt?: Date;
+}) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  const promoParams: Stripe.PromotionCodeCreateParams = {
+    coupon: params.couponId,
+    code: params.code.toUpperCase(),
+    ...(params.maxRedemptions && { max_redemptions: params.maxRedemptions }),
+    ...(params.expiresAt && { expires_at: Math.floor(params.expiresAt.getTime() / 1000) }),
+  };
+
+  return stripe.promotionCodes.create(promoParams);
+}
+
+export async function listCouponsWithPromoCodes() {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  // Fetch all coupons
+  const coupons = await stripe.coupons.list({ limit: 100 });
+
+  // Fetch all promotion codes
+  const promoCodes = await stripe.promotionCodes.list({ limit: 100 });
+
+  // Group promo codes by coupon
+  const promoCodesByCoupon = new Map<string, Stripe.PromotionCode[]>();
+  for (const promo of promoCodes.data) {
+    const couponId = typeof promo.coupon === 'string' ? promo.coupon : promo.coupon.id;
+    const existing = promoCodesByCoupon.get(couponId) || [];
+    existing.push(promo);
+    promoCodesByCoupon.set(couponId, existing);
+  }
+
+  // Combine data
+  return coupons.data.map(coupon => ({
+    ...coupon,
+    promotion_codes: promoCodesByCoupon.get(coupon.id) || [],
+  }));
+}
+
+export async function deleteCoupon(couponId: string) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  return stripe.coupons.del(couponId);
+}
+
+export async function deactivatePromotionCode(promoCodeId: string) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  return stripe.promotionCodes.update(promoCodeId, { active: false });
+}
+
+export async function getPromotionCodeDetails(promoCodeId: string) {
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  return stripe.promotionCodes.retrieve(promoCodeId);
 }
