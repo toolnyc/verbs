@@ -77,6 +77,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
         flyer_url: formData.get('flyer_url') || null,
         hover_color: formData.get('hover_color') || null,
         door_only_mode: formData.get('door_only_mode') === 'on',
+        door_tier_id: formData.get('door_tier_id') || null,
         status: formData.get('status'),
         updated_at: new Date().toISOString(),
       })
@@ -85,13 +86,25 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     if (updateError) {
       error = updateError.message;
     } else {
-      // If door_only_mode was just enabled, ensure a door tier exists
+      // If door_only_mode was just enabled and no door_tier_id is set, ensure a door tier exists
       const doorModeEnabled = formData.get('door_only_mode') === 'on';
-      if (doorModeEnabled) {
-        const existingDoorTier = tiers.find(t => t.tier_type === 'door');
-        if (!existingDoorTier) {
-          // Auto-create a door tier with $35 default price
-          const { error: doorTierError } = await supabaseAdmin
+      const submittedDoorTierId = formData.get('door_tier_id') as string;
+      if (doorModeEnabled && !submittedDoorTierId) {
+        // Refresh tiers to check for existing door tier
+        const { data: currentTiers } = await supabaseAdmin
+          .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
+        tiers = currentTiers || [];
+
+        const existingDoorTier = tiers.find(t => t.tier_type === 'door' && t.is_active);
+        if (existingDoorTier) {
+          // Use existing door tier and set door_tier_id
+          await supabaseAdmin
+            .from('events')
+            .update({ door_tier_id: existingDoorTier.id })
+            .eq('id', id);
+        } else {
+          // Auto-create a door tier with $35 default price and Stripe sync
+          const { data: newDoorTier, error: doorTierError } = await supabaseAdmin
             .from('ticket_tiers')
             .insert({
               event_id: id,
@@ -100,11 +113,38 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
               price: 35,
               is_active: true,
               sort_order: tiers.length,
-            });
+            })
+            .select()
+            .single();
 
           if (doorTierError) {
             error = `Door mode enabled but failed to create door tier: ${doorTierError.message}`;
-          } else {
+          } else if (newDoorTier) {
+            // Create Stripe product/price for the door tier
+            try {
+              const { productId, priceId } = await createProductAndPrice({
+                eventId: id!,
+                tierId: newDoorTier.id,
+                eventTitle: event.title,
+                tierName: 'Door',
+                price: 35,
+              });
+
+              // Update tier with Stripe IDs
+              await supabaseAdmin
+                .from('ticket_tiers')
+                .update({ stripe_product_id: productId, stripe_price_id: priceId })
+                .eq('id', newDoorTier.id);
+
+              // Set door_tier_id on the event
+              await supabaseAdmin
+                .from('events')
+                .update({ door_tier_id: newDoorTier.id })
+                .eq('id', id);
+            } catch (stripeErr: any) {
+              error = `Door tier created but Stripe sync failed: ${stripeErr.message}`;
+            }
+
             // Refresh tiers list
             const { data: refreshedTiers } = await supabaseAdmin
               .from('ticket_tiers').select('*').eq('event_id', id).order('sort_order');
@@ -567,14 +607,21 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
 
         {event.door_only_mode && (() => {
           const activeTiers = tiers.filter(t => t.is_active).sort((a, b) => a.price - b.price);
-          const linkedTier = activeTiers.find(t => t.tier_type === 'door') || activeTiers[0];
+          const linkedTier = event.door_tier_id
+            ? activeTiers.find(t => t.id === event.door_tier_id)
+            : activeTiers.find(t => t.tier_type === 'door') || activeTiers[0];
           return (
             <div class="door-qr-section">
-              {linkedTier ? (
-                <div class="linked-tier-info">
-                  <span class="linked-tier-label">Linked to:</span>
-                  <span class="linked-tier-name">{linkedTier.name}</span>
-                  <span class="linked-tier-price">${linkedTier.price}</span>
+              {activeTiers.length > 0 ? (
+                <div class="door-tier-selector">
+                  <label for="door_tier_id" class="door-tier-label">Checkout tier:</label>
+                  <select name="door_tier_id" id="door_tier_id" class="door-tier-select">
+                    {activeTiers.map(tier => (
+                      <option value={tier.id} selected={tier.id === linkedTier?.id}>
+                        {tier.name} - ${tier.price}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ) : (
                 <p class="form-hint text-warning">No active tiers available for door sales</p>
@@ -1023,28 +1070,25 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
     word-break: break-all;
   }
 
-  .linked-tier-info {
+  .door-tier-selector {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-sm);
     margin-bottom: var(--space-md);
-    padding: var(--space-sm) var(--space-md);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
   }
 
-  .linked-tier-label {
+  .door-tier-label {
     color: var(--color-muted);
     font-size: var(--text-sm);
+    white-space: nowrap;
   }
 
-  .linked-tier-name {
-    font-weight: 500;
-  }
-
-  .linked-tier-price {
-    font-weight: 700;
+  .door-tier-select {
+    flex: 1;
+    max-width: 200px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-sm);
   }
 
   .text-warning {

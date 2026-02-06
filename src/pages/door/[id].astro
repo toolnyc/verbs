@@ -22,18 +22,32 @@ if (!event || !event.door_only_mode) {
   return Astro.redirect('/');
 }
 
-// Find the door tier (or cheapest online tier if no door tier)
-const { data: tiers } = await supabase
-  .from('ticket_tiers')
-  .select('*')
-  .eq('event_id', id)
-  .eq('is_active', true)
-  .order('price');
-
-// Prefer door tier, fall back to cheapest tier
+// Find the tier to use for door checkout
 let tier: TicketTier | null = null;
-if (tiers && tiers.length > 0) {
-  tier = tiers.find(t => t.tier_type === 'door') || tiers[0];
+
+// If door_tier_id is set, use that specific tier
+if (event.door_tier_id) {
+  const { data: selectedTier } = await supabase
+    .from('ticket_tiers')
+    .select('*')
+    .eq('id', event.door_tier_id)
+    .eq('is_active', true)
+    .single();
+  tier = selectedTier;
+}
+
+// Fallback: find any active tier (door tier preferred, then cheapest)
+if (!tier) {
+  const { data: tiers } = await supabase
+    .from('ticket_tiers')
+    .select('*')
+    .eq('event_id', id)
+    .eq('is_active', true)
+    .order('price');
+
+  if (tiers && tiers.length > 0) {
+    tier = tiers.find(t => t.tier_type === 'door') || tiers[0];
+  }
 }
 
 if (!tier) {

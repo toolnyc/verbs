@@ -33,7 +33,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Fetch event and verify door_only_mode
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, title, door_only_mode, status')
+      .select('id, title, door_only_mode, door_tier_id, status')
       .eq('id', event_id)
       .single();
 
@@ -54,6 +54,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (event.status !== 'published') {
       return new Response(
         JSON.stringify({ error: 'Event is not available' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate tier_id matches door_tier_id if configured
+    if (event.door_tier_id && tier_id !== event.door_tier_id) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid ticket tier for door checkout' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }

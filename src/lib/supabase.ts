@@ -37,6 +37,7 @@ export interface Event {
   flyer_url: string | null;
   hover_color: string | null;
   door_only_mode: boolean;
+  door_tier_id: string | null;
   status: 'draft' | 'published' | 'archived';
   created_at: string;
   updated_at: string;
