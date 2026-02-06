@@ -21,6 +21,28 @@ supabase db pull               # Pull remote schema (requires Docker)
 supabase db diff               # Diff local vs remote (requires Docker)
 ```
 
+## Git Workflow
+
+**Always use worktrees for feature work.** Do not make changes directly on `master`.
+
+```bash
+# Create worktree for new feature
+git worktree add -b feature/my-feature ../verbs-my-feature
+
+# Work in the worktree
+cd ../verbs-my-feature
+pnpm install  # Required - worktrees don't share node_modules
+
+# When done, push and clean up
+git push -u origin feature/my-feature
+cd ../verbs
+git worktree remove ../verbs-my-feature
+```
+
+**Database environments:**
+- `verb-web` (preview) - linked by default, safe for testing migrations
+- `verb-web-prod` (production) - only push migrations after PR is merged
+
 ## Architecture
 
 VERBS is an event ticketing site built with Astro 5 in full SSR mode (`output: 'server'`), deployed to Vercel.
