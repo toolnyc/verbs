@@ -9,7 +9,7 @@ let events: any[] = [];
 if (supabaseAdmin) {
   let query = supabaseAdmin
     .from('events')
-    .select('*, ticket_tiers(*)')
+    .select('*, ticket_tiers!ticket_tiers_event_id_fkey(*)')
     .order('date', { ascending: false });
 
   if (status !== 'all') {

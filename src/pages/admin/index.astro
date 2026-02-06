@@ -10,7 +10,7 @@ if (supabaseAdmin) {
   // Get the next upcoming published event (current event)
   const { data: upcoming } = await supabaseAdmin
     .from('events')
-    .select('*, ticket_tiers(*)')
+    .select('*, ticket_tiers!ticket_tiers_event_id_fkey(*)')
     .eq('status', 'published')
     .gte('date', new Date().toISOString())
     .order('date', { ascending: true })
