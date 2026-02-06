@@ -2,31 +2,45 @@
  * Blob Storage Utilities for VERBS
  *
  * This module provides utilities for uploading and managing files in Vercel Blob Storage.
+ * Images are automatically optimized (resized to max 1920px, converted to WebP) before upload.
  *
  * ## File Organization
  * - images/   - Event images, DJ photos, mix covers (uploaded via FileUpload component)
  * - audio/    - Mix audio files (uploaded via FileUpload component)
- * - flyers/   - Event flyers for the "etch" visual effect (see below)
- *
- * ## Flyer/Etch Workflow
- * The "etch" effect displays event flyers with a special visual treatment on the homepage.
- * Currently, flyers need to be uploaded manually to the 'flyers/' prefix in Vercel Blob.
- *
- * To add a flyer:
- * 1. Upload the flyer image to Vercel Blob with prefix 'flyers/'
- * 2. The filename should include a recognizable identifier (e.g., 'flyers/event-name.jpg')
- * 3. Use listFlyers() to retrieve available flyers
- * 4. getTestFlyer() is a temporary helper that finds any blob with "test" in the pathname
- *
- * TODO: Integrate flyer upload into the admin event form using the FileUpload component
- * by adding a flyer_url field to the events table.
+ * - flyers/   - Event flyers for the "etch" visual effect
  */
 
-import { put, del, list } from '@vercel/blob';
+import { put, del } from '@vercel/blob';
+import sharp from 'sharp';
 
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 const allowedAudioTypes = ['audio/mpeg', 'audio/aiff', 'audio/wav', 'audio/x-aiff'];
 const maxImageSize = 5 * 1024 * 1024; // 5MB
+const maxImageDimension = 1920; // Max width/height in pixels
+const webpQuality = 82; // WebP quality (0-100)
+
+/**
+ * Optimize an image: resize to max dimension and convert to WebP.
+ * Returns the optimized buffer and new filename.
+ */
+async function optimizeImage(file: File): Promise<{ buffer: Buffer; filename: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const optimized = await sharp(buffer)
+    .resize(maxImageDimension, maxImageDimension, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .webp({ quality: webpQuality })
+    .toBuffer();
+
+  // Replace extension with .webp
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const filename = `${baseName}.webp`;
+
+  return { buffer: optimized, filename };
+}
 
 export async function uploadImage(file: File): Promise<string> {
   if (!allowedImageTypes.includes(file.type)) {
@@ -37,9 +51,11 @@ export async function uploadImage(file: File): Promise<string> {
     throw new Error(`Image too large. Max size: ${maxImageSize / 1024 / 1024}MB`);
   }
 
-  const blob = await put(`images/${Date.now()}-${file.name}`, file, {
+  const { buffer, filename } = await optimizeImage(file);
+
+  const blob = await put(`images/${Date.now()}-${filename}`, buffer, {
     access: 'public',
-    contentType: file.type,
+    contentType: 'image/webp',
     token: import.meta.env.BLOB_READ_WRITE_TOKEN,
   });
 
@@ -66,30 +82,9 @@ export async function deleteBlob(url: string): Promise<void> {
 }
 
 /**
- * List all flyers stored in the 'flyers/' prefix.
- * Returns an array of blob objects with url, pathname, size, etc.
- */
-export async function listFlyers() {
-  const { blobs } = await list({ prefix: 'flyers/', token: import.meta.env.BLOB_READ_WRITE_TOKEN });
-  return blobs;
-}
-
-/**
- * Get a test flyer for development purposes.
- * Finds any blob in the flyers/ prefix that contains "test" in its pathname.
- *
- * @deprecated Use the flyer_url field on events once implemented.
- * This is a temporary helper for testing the etch visual effect.
- */
-export async function getTestFlyer() {
-  const flyers = await listFlyers();
-  const testImage = flyers.find((blob) => blob.pathname.includes('test'));
-  return testImage?.url;
-}
-
-/**
  * Upload a flyer image for an event.
  * Stores in the 'flyers/' prefix with a timestamped filename.
+ * Images are automatically optimized before upload.
  */
 export async function uploadFlyer(file: File): Promise<string> {
   if (!allowedImageTypes.includes(file.type)) {
@@ -100,9 +95,11 @@ export async function uploadFlyer(file: File): Promise<string> {
     throw new Error(`Image too large. Max size: ${maxImageSize / 1024 / 1024}MB`);
   }
 
-  const blob = await put(`flyers/${Date.now()}-${file.name}`, file, {
+  const { buffer, filename } = await optimizeImage(file);
+
+  const blob = await put(`flyers/${Date.now()}-${filename}`, buffer, {
     access: 'public',
-    contentType: file.type,
+    contentType: 'image/webp',
     token: import.meta.env.BLOB_READ_WRITE_TOKEN,
   });
 
