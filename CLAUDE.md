@@ -109,3 +109,21 @@ The cursor-following flyer preview system (`src/lib/animations.ts` `createHoverP
 **GSAP tween races (overwrite: 'auto')**: The show tween (0.45s `fromTo`) and hide tween (0.3s `to`) target the same properties (opacity, scale) on the same element. GSAP 3 defaults to `overwrite: false`, meaning both tweens run simultaneously. If `hide()` is called during the show animation, the hide tween finishes first (0.3s < 0.45s), and the show tween's remaining frames push opacity back up — creating an orphaned visible flyer with `isVisible = false` (so `hide()` becomes a no-op). Fix: use `overwrite: 'auto'` on both tweens so each kills the other's overlapping properties without nuking the `quickTo` x/y tweens.
 
 **ViewTransition cleanup**: Flyer previews are reparented from `.verb-item` to `document.body` for correct fixed positioning. On navigation, `astro:before-preparation` force-hides all `body > .flyer-preview` elements, and `initVerbGridAnimations` removes orphans on re-init. The cleanup function moves previews back into their items so the next init cycle can find them.
+
+### PostgREST / Supabase — Multiple Foreign Keys Between Tables
+
+**CRITICAL**: When adding a foreign key that creates a second relationship between two tables, you MUST update all existing queries that embed the related table.
+
+Example: Adding `events.door_tier_id` → `ticket_tiers.id` created a second FK between `events` and `ticket_tiers` (the first being `ticket_tiers.event_id` → `events.id`). This caused PostgREST error `PGRST201: Could not embed because more than one relationship was found`.
+
+**Before** (ambiguous, breaks):
+```typescript
+.select(`*, ticket_tiers (*)`)
+```
+
+**After** (explicit FK, works):
+```typescript
+.select(`*, ticket_tiers!ticket_tiers_event_id_fkey (*)`)
+```
+
+Always test queries locally after adding FKs that reference tables already linked by other FKs. The dev server console will show the PGRST201 error with hints about which FK names to use.
