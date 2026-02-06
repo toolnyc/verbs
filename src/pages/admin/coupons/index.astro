@@ -1,6 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { listCouponsWithPromoCodes, deleteCoupon, deactivatePromotionCode } from '../../../lib/stripe';
+import { supabaseAdmin } from '../../../lib/supabase';
 
 let coupons: any[] = [];
 let error = '';
@@ -33,6 +34,16 @@ try {
 } catch (e: any) {
   error = e.message;
 }
+
+// Fetch all tiers with stripe_product_id for mapping restrictions to human-readable names
+const { data: allTiers } = await supabaseAdmin
+  .from('ticket_tiers')
+  .select('stripe_product_id, name, event:events(title)')
+  .not('stripe_product_id', 'is', null);
+
+const productIdToTier = new Map(
+  allTiers?.map(t => [t.stripe_product_id, t]) || []
+);
 
 function formatDiscount(coupon: any) {
   if (coupon.percent_off) {
@@ -83,21 +94,36 @@ function formatDate(timestamp: number | null) {
               <div class="promo-codes-header">Promotion Codes</div>
               {coupon.promotion_codes.map((promo: any) => (
                 <div class="promo-row">
-                  <code class="promo-code">{promo.code}</code>
-                  <span class={`status-badge ${promo.active ? 'published' : 'archived'}`}>
-                    {promo.active ? 'Active' : 'Inactive'}
-                  </span>
-                  <span class="text-sm text-muted">
-                    Used: {promo.times_redeemed || 0}{promo.max_redemptions ? ` / ${promo.max_redemptions}` : ''}
-                  </span>
-                  {promo.active && (
-                    <form method="POST" class="inline-form">
-                      <input type="hidden" name="action" value="deactivate_promo" />
-                      <input type="hidden" name="promo_id" value={promo.id} />
-                      <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Deactivate this promotion code?')">
-                        Deactivate
-                      </button>
-                    </form>
+                  <div class="promo-row-main">
+                    <code class="promo-code">{promo.code}</code>
+                    <span class={`status-badge ${promo.active ? 'published' : 'archived'}`}>
+                      {promo.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <span class="text-sm text-muted">
+                      Used: {promo.times_redeemed || 0}{promo.max_redemptions ? ` / ${promo.max_redemptions}` : ''}
+                    </span>
+                    {promo.active && (
+                      <form method="POST" class="inline-form">
+                        <input type="hidden" name="action" value="deactivate_promo" />
+                        <input type="hidden" name="promo_id" value={promo.id} />
+                        <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Deactivate this promotion code?')">
+                          Deactivate
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                  {promo.restrictions?.products?.length > 0 && (
+                    <div class="promo-restrictions">
+                      {promo.restrictions.products.map((productId: string) => {
+                        const tier = productIdToTier.get(productId);
+                        const event = tier?.event as { title: string } | null;
+                        return tier && event ? (
+                          <span class="restriction-badge">{event.title} - {tier.name}</span>
+                        ) : (
+                          <span class="restriction-badge">{productId}</span>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               ))}
@@ -217,9 +243,15 @@ function formatDate(timestamp: number | null) {
 
   .promo-row {
     display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm) 0;
+  }
+
+  .promo-row-main {
+    display: flex;
     align-items: center;
     gap: var(--space-md);
-    padding: var(--space-sm) 0;
     flex-wrap: wrap;
   }
 
@@ -228,6 +260,21 @@ function formatDate(timestamp: number | null) {
     font-size: var(--text-sm);
     background: var(--color-bg-alt);
     padding: var(--space-xs) var(--space-sm);
+  }
+
+  .promo-restrictions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    padding-left: var(--space-sm);
+  }
+
+  .restriction-badge {
+    font-size: var(--text-xs);
+    background: var(--color-bg-alt);
+    padding: 2px var(--space-xs);
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
   }
 
   .no-promos {
@@ -267,10 +314,14 @@ function formatDate(timestamp: number | null) {
       gap: var(--space-xs);
     }
 
-    .promo-row {
+    .promo-row-main {
       flex-direction: column;
       align-items: flex-start;
       gap: var(--space-sm);
+    }
+
+    .promo-restrictions {
+      padding-left: 0;
     }
   }
 </style>

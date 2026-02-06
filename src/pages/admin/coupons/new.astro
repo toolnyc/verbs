@@ -1,8 +1,30 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { createCoupon, createPromotionCode } from '../../../lib/stripe';
+import { supabaseAdmin } from '../../../lib/supabase';
 
 let error = '';
+
+// Fetch ticket tiers with events for product restrictions
+const { data: tiers } = await supabaseAdmin
+  .from('ticket_tiers')
+  .select('id, name, stripe_product_id, event:events(id, title, status)')
+  .not('stripe_product_id', 'is', null)
+  .eq('is_active', true)
+  .order('event_id');
+
+// Group tiers by event
+const tiersByEvent = new Map<string, { eventTitle: string; tiers: typeof tiers }>();
+for (const tier of tiers || []) {
+  const event = tier.event as { id: string; title: string; status: string } | null;
+  if (!event) continue;
+  const existing = tiersByEvent.get(event.id);
+  if (existing) {
+    existing.tiers?.push(tier);
+  } else {
+    tiersByEvent.set(event.id, { eventTitle: event.title, tiers: [tier] });
+  }
+}
 
 if (Astro.request.method === 'POST') {
   const formData = await Astro.request.formData();
@@ -14,6 +36,14 @@ if (Astro.request.method === 'POST') {
   const expiresAt = formData.get('expires_at') as string;
   const promoCode = formData.get('promo_code') as string;
   const promoMaxRedemptions = formData.get('promo_max_redemptions') as string;
+
+  // Get selected tier IDs for product restrictions
+  const selectedTierIds = formData.getAll('restricted_tiers') as string[];
+
+  // Map tier IDs to stripe_product_ids
+  const restrictedProducts = selectedTierIds
+    .map(tierId => tiers?.find(t => t.id === tierId)?.stripe_product_id)
+    .filter((id): id is string => !!id);
 
   try {
     // Create the coupon
@@ -32,6 +62,7 @@ if (Astro.request.method === 'POST') {
         code: promoCode,
         maxRedemptions: promoMaxRedemptions ? parseInt(promoMaxRedemptions, 10) : undefined,
         expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+        restrictedProducts: restrictedProducts.length > 0 ? restrictedProducts : undefined,
       });
     }
 
@@ -120,6 +151,32 @@ if (Astro.request.method === 'POST') {
       </div>
     </div>
 
+    <div class="form-section">
+      <h2 class="form-section-title">Product Restrictions</h2>
+      <p class="form-section-desc">Limit this promotion code to specific ticket tiers</p>
+
+      {tiersByEvent.size > 0 ? (
+        <div class="tier-restrictions">
+          {[...tiersByEvent.entries()].map(([eventId, { eventTitle, tiers: eventTiers }]) => (
+            <div class="event-group">
+              <div class="event-name">{eventTitle}</div>
+              <div class="tier-checkboxes">
+                {eventTiers?.map(tier => (
+                  <label class="checkbox-label">
+                    <input type="checkbox" name="restricted_tiers" value={tier.id} />
+                    <span>{tier.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p class="form-hint">Leave all unchecked to allow on any purchase</p>
+        </div>
+      ) : (
+        <p class="text-muted text-sm">No active ticket tiers with Stripe products available</p>
+      )}
+    </div>
+
     <div class="form-actions">
       <a href="/admin/coupons" class="secondary">Cancel</a>
       <button type="submit">Create Coupon</button>
@@ -185,5 +242,41 @@ if (Astro.request.method === 'POST') {
     color: #c5221f;
     padding: var(--space-md);
     font-size: var(--text-sm);
+  }
+
+  .tier-restrictions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .event-group {
+    background: var(--color-bg-alt);
+    padding: var(--space-md);
+  }
+
+  .event-name {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  .tier-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
   }
 </style>
