@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Critical Rules
+
+**BEFORE writing any code or making changes**, check:
+1. Am I on `master`? If yes, STOP and create a worktree first
+2. Never commit directly to master - all feature work requires a worktree
+
+This is non-negotiable. If you're about to edit files and `git branch` shows `master`, run:
+```bash
+git worktree add -b feature/<name> ../verbs-<name>
+cd ../verbs-<name>
+pnpm install
+```
+
 ## Commands
 
 ```bash
