@@ -5,7 +5,6 @@ import Footer from '../components/public/Footer.astro';
 import HouseRulesModal from '../components/public/HouseRulesModal.astro';
 import { getAllEvents, getPublishedEvents } from '../lib/supabase';
 import type { TicketTier } from '../lib/supabase';
-import { listFlyers } from '../lib/blob';
 
 // Check if user is authenticated
 const user = Astro.locals.user;
@@ -16,14 +15,6 @@ const user = Astro.locals.user;
 const events = user ? await getAllEvents() : await getPublishedEvents();
 // Sort descending so newest events appear first
 events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-// TEST: Override all event images with blob flyer
-const flyers = await listFlyers();
-// Filter out folder entries (size 0) and get the first actual image
-const testFlyerUrl = flyers.find(f => f.size > 0)?.url;
-if (testFlyerUrl) {
-  events.forEach(e => e.image_url = testFlyerUrl);
-}
 
 // Find the next upcoming event (closest future date to today)
 const now = new Date();
