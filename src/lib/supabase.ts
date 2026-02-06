@@ -193,7 +193,7 @@ export async function getPublishedEvents() {
     .from('events')
     .select(`
       *,
-      ticket_tiers (*)
+      ticket_tiers!ticket_tiers_event_id_fkey (*)
     `)
     .eq('status', 'published')
     .order('date', { ascending: true });
@@ -212,7 +212,7 @@ export async function getAllEvents() {
     .from('events')
     .select(`
       *,
-      ticket_tiers (*)
+      ticket_tiers!ticket_tiers_event_id_fkey (*)
     `)
     .in('status', ['published', 'draft'])
     .order('date', { ascending: true });
