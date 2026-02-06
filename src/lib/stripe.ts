@@ -214,6 +214,7 @@ export async function createCoupon(params: {
   discountValue: number;
   maxRedemptions?: number;
   expiresAt?: Date;
+  appliesTo?: string[];
 }) {
   if (!stripe) {
     throw new Error('Stripe not configured');
@@ -226,6 +227,7 @@ export async function createCoupon(params: {
       : { amount_off: Math.round(params.discountValue * 100), currency: 'usd' }),
     ...(params.maxRedemptions && { max_redemptions: params.maxRedemptions }),
     ...(params.expiresAt && { redeem_by: Math.floor(params.expiresAt.getTime() / 1000) }),
+    ...(params.appliesTo?.length && { applies_to: { products: params.appliesTo } }),
   };
 
   return stripe.coupons.create(couponParams);
@@ -236,7 +238,6 @@ export async function createPromotionCode(params: {
   code: string;
   maxRedemptions?: number;
   expiresAt?: Date;
-  restrictedProducts?: string[];
 }) {
   if (!stripe) {
     throw new Error('Stripe not configured');
@@ -247,9 +248,6 @@ export async function createPromotionCode(params: {
     code: params.code.toUpperCase(),
     ...(params.maxRedemptions && { max_redemptions: params.maxRedemptions }),
     ...(params.expiresAt && { expires_at: Math.floor(params.expiresAt.getTime() / 1000) }),
-    ...(params.restrictedProducts?.length && {
-      restrictions: { products: params.restrictedProducts },
-    }),
   };
 
   return stripe.promotionCodes.create(promoParams);

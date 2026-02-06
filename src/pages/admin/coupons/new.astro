@@ -46,13 +46,14 @@ if (Astro.request.method === 'POST') {
     .filter((id): id is string => !!id);
 
   try {
-    // Create the coupon
+    // Create the coupon (with product restrictions if selected)
     const coupon = await createCoupon({
       name,
       discountType,
       discountValue,
       maxRedemptions: maxRedemptions ? parseInt(maxRedemptions, 10) : undefined,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      appliesTo: restrictedProducts.length > 0 ? restrictedProducts : undefined,
     });
 
     // Create the promotion code if provided
@@ -62,7 +63,6 @@ if (Astro.request.method === 'POST') {
         code: promoCode,
         maxRedemptions: promoMaxRedemptions ? parseInt(promoMaxRedemptions, 10) : undefined,
         expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-        restrictedProducts: restrictedProducts.length > 0 ? restrictedProducts : undefined,
       });
     }
 
@@ -153,7 +153,7 @@ if (Astro.request.method === 'POST') {
 
     <div class="form-section">
       <h2 class="form-section-title">Product Restrictions</h2>
-      <p class="form-section-desc">Limit this promotion code to specific ticket tiers</p>
+      <p class="form-section-desc">Limit this coupon to specific ticket tiers</p>
 
       {tiersByEvent.size > 0 ? (
         <div class="tier-restrictions">

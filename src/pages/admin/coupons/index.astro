@@ -89,41 +89,41 @@ function formatDate(timestamp: number | null) {
             </div>
           </div>
 
+          {coupon.applies_to?.products?.length > 0 && (
+            <div class="coupon-restrictions">
+              <span class="restrictions-label">Applies to:</span>
+              {coupon.applies_to.products.map((productId: string) => {
+                const tier = productIdToTier.get(productId);
+                const event = tier?.event as { title: string } | null;
+                return tier && event ? (
+                  <span class="restriction-badge">{event.title} - {tier.name}</span>
+                ) : (
+                  <span class="restriction-badge">{productId}</span>
+                );
+              })}
+            </div>
+          )}
+
           {coupon.promotion_codes.length > 0 && (
             <div class="promo-codes">
               <div class="promo-codes-header">Promotion Codes</div>
               {coupon.promotion_codes.map((promo: any) => (
                 <div class="promo-row">
-                  <div class="promo-row-main">
-                    <code class="promo-code">{promo.code}</code>
-                    <span class={`status-badge ${promo.active ? 'published' : 'archived'}`}>
-                      {promo.active ? 'Active' : 'Inactive'}
-                    </span>
-                    <span class="text-sm text-muted">
-                      Used: {promo.times_redeemed || 0}{promo.max_redemptions ? ` / ${promo.max_redemptions}` : ''}
-                    </span>
-                    {promo.active && (
-                      <form method="POST" class="inline-form">
-                        <input type="hidden" name="action" value="deactivate_promo" />
-                        <input type="hidden" name="promo_id" value={promo.id} />
-                        <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Deactivate this promotion code?')">
-                          Deactivate
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                  {promo.restrictions?.products?.length > 0 && (
-                    <div class="promo-restrictions">
-                      {promo.restrictions.products.map((productId: string) => {
-                        const tier = productIdToTier.get(productId);
-                        const event = tier?.event as { title: string } | null;
-                        return tier && event ? (
-                          <span class="restriction-badge">{event.title} - {tier.name}</span>
-                        ) : (
-                          <span class="restriction-badge">{productId}</span>
-                        );
-                      })}
-                    </div>
+                  <code class="promo-code">{promo.code}</code>
+                  <span class={`status-badge ${promo.active ? 'published' : 'archived'}`}>
+                    {promo.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span class="text-sm text-muted">
+                    Used: {promo.times_redeemed || 0}{promo.max_redemptions ? ` / ${promo.max_redemptions}` : ''}
+                  </span>
+                  {promo.active && (
+                    <form method="POST" class="inline-form">
+                      <input type="hidden" name="action" value="deactivate_promo" />
+                      <input type="hidden" name="promo_id" value={promo.id} />
+                      <button type="submit" class="btn-sm btn-warning" onclick="return confirm('Deactivate this promotion code?')">
+                        Deactivate
+                      </button>
+                    </form>
                   )}
                 </div>
               ))}
@@ -243,15 +243,9 @@ function formatDate(timestamp: number | null) {
 
   .promo-row {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-sm) 0;
-  }
-
-  .promo-row-main {
-    display: flex;
     align-items: center;
     gap: var(--space-md);
+    padding: var(--space-sm) 0;
     flex-wrap: wrap;
   }
 
@@ -262,11 +256,18 @@ function formatDate(timestamp: number | null) {
     padding: var(--space-xs) var(--space-sm);
   }
 
-  .promo-restrictions {
+  .coupon-restrictions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-xs);
-    padding-left: var(--space-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .restrictions-label {
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+    margin-right: var(--space-xs);
   }
 
   .restriction-badge {
@@ -314,14 +315,10 @@ function formatDate(timestamp: number | null) {
       gap: var(--space-xs);
     }
 
-    .promo-row-main {
+    .promo-row {
       flex-direction: column;
       align-items: flex-start;
       gap: var(--space-sm);
-    }
-
-    .promo-restrictions {
-      padding-left: 0;
     }
   }
 </style>
