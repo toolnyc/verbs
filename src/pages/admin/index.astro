@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../lib/supabase';
 import { isEventPast } from '../../lib/utils';
 
 let currentEvent: any = null;
+let allOrders: any[] = [];
 let recentOrders: any[] = [];
 let lowStockTiers: any[] = [];
 
@@ -20,8 +21,18 @@ if (supabaseAdmin) {
   const upcoming = (candidates || []).filter(e => !isEventPast(e));
   currentEvent = upcoming.length > 0 ? upcoming[0] : null;
 
-  // Recent orders for current event
+  // Orders for current event
   if (currentEvent) {
+    // All completed orders for stats
+    const { data: completedOrders } = await supabaseAdmin
+      .from('orders')
+      .select('quantity, amount_paid, refunded_amount')
+      .eq('event_id', currentEvent.id)
+      .eq('status', 'completed');
+
+    allOrders = completedOrders || [];
+
+    // Recent orders for display
     const { data: eventOrders } = await supabaseAdmin
       .from('orders')
       .select('*, tier:ticket_tiers(name)')
@@ -62,8 +73,8 @@ function formatDate(date: string) {
   });
 }
 
-function getTotalSold(tiers: any[]) {
-  return tiers.reduce((sum, t) => sum + (t.sold_count || 0), 0);
+function getTotalSold(orders: any[]) {
+  return orders.reduce((sum, o) => sum + (o.quantity || 0), 0);
 }
 
 function getTotalRevenue(orders: any[]) {
@@ -122,11 +133,11 @@ function getTotalRevenue(orders: any[]) {
 
       <div class="event-stats">
         <div class="stat">
-          <span class="stat-value">{getTotalSold(getOnlineTiers(currentEvent.ticket_tiers || []))}</span>
+          <span class="stat-value">{getTotalSold(allOrders)}</span>
           <span class="stat-label">Tickets Sold</span>
         </div>
         <div class="stat">
-          <span class="stat-value">{formatCurrency(getTotalRevenue(recentOrders))}</span>
+          <span class="stat-value">{formatCurrency(getTotalRevenue(allOrders))}</span>
           <span class="stat-label">Revenue</span>
         </div>
       </div>
