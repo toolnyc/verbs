@@ -5,7 +5,7 @@
  */
 export function isEventPast(event: { date: string; time_end?: string | null }): boolean {
   const startDate = new Date(event.date);
-  const DEFAULT_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+  const DEFAULT_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   let endDate: Date;
   if (event.time_end) {
