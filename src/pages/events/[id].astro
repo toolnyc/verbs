@@ -34,10 +34,12 @@ const isDraft = event.status === 'draft';
 const eventDate = new Date(event.date);
 const isPast = isEventPast(event);
 
+const eventTimezone = event.timezone || 'America/New_York';
 const formattedDate = eventDate.toLocaleDateString('en-US', {
   weekday: 'long',
   month: 'long',
   day: 'numeric',
+  timeZone: eventTimezone,
 });
 
 // Format time in 24-hour military format with timezone
@@ -54,7 +56,10 @@ const timezoneAbbr = new Intl.DateTimeFormat('en-US', {
   timeZoneName: 'short',
 }).formatToParts(eventDate).find(p => p.type === 'timeZoneName')?.value || '';
 
-const formattedYear = eventDate.getFullYear();
+const formattedYear = new Intl.DateTimeFormat('en-US', {
+  timeZone: eventTimezone,
+  year: 'numeric',
+}).format(eventDate);
 
 const displayAddress = formatDisplayAddress(event.venue_address);
 ---

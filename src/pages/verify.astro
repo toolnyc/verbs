@@ -65,6 +65,7 @@ const formattedDate = orderDetails?.eventDate.toLocaleDateString('en-US', {
   weekday: 'short',
   month: 'short',
   day: 'numeric',
+  timeZone: orderDetails?.eventTimezone,
 });
 
 const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {

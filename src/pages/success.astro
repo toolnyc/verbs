@@ -80,6 +80,7 @@ const formattedDate = orderDetails?.eventDate.toLocaleDateString('en-US', {
   month: 'long',
   day: 'numeric',
   year: 'numeric',
+  timeZone: orderDetails?.eventTimezone,
 });
 
 const formattedTime = orderDetails?.eventDate.toLocaleTimeString('en-GB', {

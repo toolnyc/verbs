@@ -3,18 +3,22 @@ import Admin from '../../../layouts/Admin.astro';
 import FileUpload from '../../../components/admin/FileUpload.astro';
 import AddressAutocomplete from '../../../components/admin/AddressAutocomplete.astro';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { datetimeLocalToUTC } from '../../../lib/utils';
 
 let error = '';
 
 if (Astro.request.method === 'POST' && supabaseAdmin) {
   const formData = await Astro.request.formData();
+  const tz = formData.get('timezone') as string || 'America/New_York';
+  const dateLocal = formData.get('date') as string;
+  const timeEndLocal = formData.get('time_end') as string;
 
   const eventData = {
     title: formData.get('title') as string,
     description: formData.get('description') as string || null,
-    date: formData.get('date') as string,
-    time_end: formData.get('time_end') as string || null,
-    timezone: formData.get('timezone') as string || 'America/New_York',
+    date: datetimeLocalToUTC(dateLocal, tz),
+    time_end: timeEndLocal ? datetimeLocalToUTC(timeEndLocal, tz) : null,
+    timezone: tz,
     venue_name: formData.get('venue_name') as string || null,
     venue_address: formData.get('venue_address') as string || null,
     venue_link: formData.get('venue_link') as string || null,

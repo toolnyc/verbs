@@ -4,6 +4,7 @@ import FileUpload from '../../../../components/admin/FileUpload.astro';
 import AddressAutocomplete from '../../../../components/admin/AddressAutocomplete.astro';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { createProductAndPrice, updatePrice, updateProductName, archiveProduct, archiveProductsForEvent } from '../../../../lib/stripe';
+import { formatDateForInput, datetimeLocalToUTC } from '../../../../lib/utils';
 
 const { id } = Astro.params;
 
@@ -61,15 +62,18 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     const newStatus = formData.get('status') as string;
     const titleChanged = newTitle !== event.title;
     const statusChangedToArchived = newStatus === 'archived' && event.status !== 'archived';
+    const tz = formData.get('timezone') as string || 'America/New_York';
+    const dateLocal = formData.get('date') as string;
+    const timeEndLocal = formData.get('time_end') as string;
 
     const { error: updateError } = await supabaseAdmin
       .from('events')
       .update({
         title: newTitle,
         description: formData.get('description') || null,
-        date: formData.get('date'),
-        time_end: formData.get('time_end') || null,
-        timezone: formData.get('timezone') || 'America/New_York',
+        date: datetimeLocalToUTC(dateLocal, tz),
+        time_end: timeEndLocal ? datetimeLocalToUTC(timeEndLocal, tz) : null,
+        timezone: tz,
         venue_name: formData.get('venue_name') as string || null,
         venue_address: formData.get('venue_address') || null,
         venue_link: formData.get('venue_link') || null,
@@ -513,9 +517,7 @@ if (!event) {
   return Astro.redirect('/admin/events');
 }
 
-function formatDateForInput(date: string) {
-  return new Date(date).toISOString().slice(0, 16);
-}
+const eventTimezone = event.timezone || 'America/New_York';
 
 const assignedDjIds = new Set(eventDjs.map(ed => ed.dj_id));
 const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
@@ -555,12 +557,12 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
         <div class="form-row">
           <div class="form-group">
             <label for="date" class="form-label">Start Date & Time *</label>
-            <input type="datetime-local" id="date" name="date" value={formatDateForInput(event.date)} required />
+            <input type="datetime-local" id="date" name="date" value={formatDateForInput(event.date, eventTimezone)} required />
           </div>
 
           <div class="form-group">
             <label for="time_end" class="form-label">End Time</label>
-            <input type="datetime-local" id="time_end" name="time_end" value={event.time_end ? formatDateForInput(event.time_end) : ''} />
+            <input type="datetime-local" id="time_end" name="time_end" value={event.time_end ? formatDateForInput(event.time_end, eventTimezone) : ''} />
           </div>
         </div>
 
