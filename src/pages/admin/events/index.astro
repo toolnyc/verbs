@@ -1,6 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { isEventPast } from '../../../lib/utils';
 
 const status = Astro.url.searchParams.get('status') || 'all';
 
@@ -66,10 +67,7 @@ const filters = [
     <div class="events-list">
       {events.map(event => {
         const stats = getTicketStats(event);
-        const eventEnd = event.time_end
-          ? new Date(event.time_end)
-          : new Date(new Date(event.date).getTime() + 6 * 60 * 60 * 1000);
-        const isPast = eventEnd < new Date();
+        const isPast = isEventPast(event);
 
         return (
           <div class:list={['event-row', { past: isPast }]}>

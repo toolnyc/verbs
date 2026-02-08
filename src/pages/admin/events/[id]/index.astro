@@ -86,9 +86,33 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
     if (updateError) {
       error = updateError.message;
     } else {
-      // If door_only_mode was just enabled and no door_tier_id is set, ensure a door tier exists
+      // Ensure door tier exists and has Stripe sync when door mode is on
       const doorModeEnabled = formData.get('door_only_mode') === 'on';
       const submittedDoorTierId = formData.get('door_tier_id') as string;
+
+      // If door mode is on and a tier is selected, ensure it has Stripe sync
+      if (doorModeEnabled && submittedDoorTierId) {
+        const { data: doorTier } = await supabaseAdmin
+          .from('ticket_tiers').select('*').eq('id', submittedDoorTierId).single();
+        if (doorTier && !doorTier.stripe_price_id) {
+          try {
+            const { productId, priceId } = await createProductAndPrice({
+              eventId: id!,
+              tierId: doorTier.id,
+              eventTitle: formData.get('title') as string || event.title,
+              tierName: doorTier.name,
+              price: doorTier.price,
+            });
+            await supabaseAdmin
+              .from('ticket_tiers')
+              .update({ stripe_product_id: productId, stripe_price_id: priceId })
+              .eq('id', doorTier.id);
+          } catch (stripeErr: any) {
+            error = `Door tier Stripe sync failed: ${stripeErr.message}. Door checkout will not work until resolved.`;
+          }
+        }
+      }
+
       if (doorModeEnabled && !submittedDoorTierId) {
         // Refresh tiers to check for existing door tier
         const { data: currentTiers } = await supabaseAdmin
@@ -225,7 +249,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
 
     if (tierError) {
       error = tierError.message;
-    } else if (newTier && tierType === 'online') {
+    } else if (newTier) {
       // Create Stripe product with proper metadata
       try {
         const { productId, priceId } = await createProductAndPrice({
@@ -387,7 +411,7 @@ if (Astro.request.method === 'POST' && supabaseAdmin && event) {
       .eq('id', tierId)
       .single();
 
-    if (tier && tier.tier_type === 'online' && !tier.stripe_price_id) {
+    if (tier && !tier.stripe_price_id) {
       try {
         const { productId, priceId } = await createProductAndPrice({
           eventId: id!,
@@ -672,7 +696,7 @@ const availableDjs = allDjs.filter(dj => !assignedDjIds.has(dj.id));
                   </div>
                   <div class="tier-actions">
                     <button type="button" class="btn-sm tier-edit-toggle" data-tier-id={tier.id}>Edit</button>
-                    {tier.tier_type === 'online' && !tier.stripe_price_id && (
+                    {!tier.stripe_price_id && (
                       <form method="POST" class="inline-form">
                         <input type="hidden" name="action" value="sync_tier_stripe" />
                         <input type="hidden" name="tier_id" value={tier.id} />

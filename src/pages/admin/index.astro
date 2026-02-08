@@ -1,23 +1,24 @@
 ---
 import Admin from '../../layouts/Admin.astro';
 import { supabaseAdmin } from '../../lib/supabase';
+import { isEventPast } from '../../lib/utils';
 
 let currentEvent: any = null;
 let recentOrders: any[] = [];
 let lowStockTiers: any[] = [];
 
 if (supabaseAdmin) {
-  // Get the next upcoming published event (current event)
-  const { data: upcoming } = await supabaseAdmin
+  // Get published events from the last 24h onward (wide net), then filter with isEventPast
+  const lookback = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: candidates } = await supabaseAdmin
     .from('events')
     .select('*, ticket_tiers!ticket_tiers_event_id_fkey(*)')
     .eq('status', 'published')
-    .gte('date', new Date().toISOString())
-    .order('date', { ascending: true })
-    .limit(1)
-    .single();
+    .gte('date', lookback)
+    .order('date', { ascending: true });
 
-  currentEvent = upcoming;
+  const upcoming = (candidates || []).filter(e => !isEventPast(e));
+  currentEvent = upcoming.length > 0 ? upcoming[0] : null;
 
   // Recent orders for current event
   if (currentEvent) {

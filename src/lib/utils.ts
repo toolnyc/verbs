@@ -1,12 +1,21 @@
 /**
- * Determine if an event has passed. Uses time_end if available,
- * otherwise defaults to 6 hours after the start time.
+ * Determine if an event has passed. Uses time_end if available
+ * and valid (must be after start), otherwise defaults to 6 hours
+ * after the start time.
  */
 export function isEventPast(event: { date: string; time_end?: string | null }): boolean {
   const startDate = new Date(event.date);
-  const endDate = event.time_end
-    ? new Date(event.time_end)
-    : new Date(startDate.getTime() + 6 * 60 * 60 * 1000);
+  const DEFAULT_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+  let endDate: Date;
+  if (event.time_end) {
+    const parsed = new Date(event.time_end);
+    // Only trust time_end if it's after the start time
+    endDate = parsed > startDate ? parsed : new Date(startDate.getTime() + DEFAULT_DURATION_MS);
+  } else {
+    endDate = new Date(startDate.getTime() + DEFAULT_DURATION_MS);
+  }
+
   return endDate < new Date();
 }
 
