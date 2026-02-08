@@ -32,8 +32,8 @@ function formatDate(date: string) {
 
 function getTicketStats(event: any) {
   const tiers = event.ticket_tiers || [];
+  const totalSold = tiers.reduce((sum: number, t: any) => sum + (t.sold_count || 0), 0);
   const activeTiers = tiers.filter((t: any) => t.is_active);
-  const totalSold = activeTiers.reduce((sum: number, t: any) => sum + t.sold_count, 0);
   const totalStock = activeTiers.reduce((sum: number, t: any) => sum + (t.max_stock || 0), 0);
   const hasUnlimited = activeTiers.some((t: any) => t.max_stock === null);
 
