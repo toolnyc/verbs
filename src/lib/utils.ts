@@ -20,6 +20,46 @@ export function isEventPast(event: { date: string; time_end?: string | null }): 
 }
 
 /**
+ * Format a UTC date string for a datetime-local input in the given timezone.
+ * Converts from UTC to the event's local time so the admin sees the correct time.
+ */
+export function formatDateForInput(dateStr: string, timezone: string): string {
+  const date = new Date(dateStr);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  const hour = get('hour') === '24' ? '00' : get('hour');
+
+  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+}
+
+/**
+ * Convert a datetime-local value (in the event's timezone) to a UTC ISO string
+ * for storage in the database.
+ */
+export function datetimeLocalToUTC(datetimeLocal: string, timezone: string): string {
+  const [datePart, timePart] = datetimeLocal.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+
+  const naiveUTC = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+
+  const utcRepr = naiveUTC.toLocaleString('en-US', { timeZone: 'UTC' });
+  const tzRepr = naiveUTC.toLocaleString('en-US', { timeZone: timezone });
+  const offsetMs = new Date(tzRepr).getTime() - new Date(utcRepr).getTime();
+
+  return new Date(naiveUTC.getTime() - offsetMs).toISOString();
+}
+
+/**
  * Sanitize a full address to show only street and city.
  * Takes addresses like "123 Main St, Brooklyn, Kings County, NY 11201, USA"
  * and returns "123 Main St, Brooklyn"

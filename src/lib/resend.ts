@@ -91,14 +91,15 @@ export async function sendTicketConfirmation({
     return;
   }
 
+  const timezone = eventTimezone || 'America/New_York';
+
   const formattedDate = eventDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: timezone,
   });
-
-  const timezone = eventTimezone || 'America/New_York';
   const formattedTime = eventDate.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
@@ -276,6 +277,7 @@ export async function sendWelcomeEmail({
       weekday: 'long',
       month: 'long',
       day: 'numeric',
+      timeZone: upcomingEvent.timezone,
     });
     const formattedTime = upcomingEvent.date.toLocaleTimeString('en-GB', {
       hour: '2-digit',

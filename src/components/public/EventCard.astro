@@ -12,11 +12,13 @@ const { event, compact = false } = Astro.props;
 
 const eventDate = new Date(event.date);
 const isPast = isEventPast(event);
+const eventTimezone = event.timezone || 'America/New_York';
 
 const formattedDate = eventDate.toLocaleDateString('en-US', {
   weekday: 'short',
   month: 'short',
   day: 'numeric',
+  timeZone: eventTimezone,
 });
 
 // Format time in 24-hour military format
@@ -40,8 +42,8 @@ const displayAddress = formatDisplayAddress(event.venue_address);
       <div class="event-image img-placeholder"></div>
     )}
     <div class="event-date-overlay">
-      <span class="date-day">{eventDate.getDate()}</span>
-      <span class="date-month">{eventDate.toLocaleDateString('en-US', { month: 'short' })}</span>
+      <span class="date-day">{new Intl.DateTimeFormat('en-US', { timeZone: eventTimezone, day: 'numeric' }).format(eventDate)}</span>
+      <span class="date-month">{new Intl.DateTimeFormat('en-US', { timeZone: eventTimezone, month: 'short' }).format(eventDate)}</span>
     </div>
   </div>
 
