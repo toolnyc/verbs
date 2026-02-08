@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../lib/supabase';
 import { verifyWebhookSignature, stripe, getPromotionCodeDetails } from '../../lib/stripe';
 import { sendTicketConfirmation } from '../../lib/resend';
+import { parseCheckoutSession, parseRefundCharge, clampSoldCount } from '../../lib/webhook';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -30,21 +31,15 @@ export const POST: APIRoute = async ({ request }) => {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any;
 
-      const eventId = session.metadata?.event_id;
-      const tierId = session.metadata?.ticket_tier_id;
-      const quantity = parseInt(session.metadata?.quantity || '1', 10);
-      const checkoutType = session.metadata?.checkout_type || 'online';
-
-      if (!eventId || !tierId) {
-        console.error('Missing metadata in checkout session:', session.id, 'metadata:', JSON.stringify(session.metadata));
+      let checkout;
+      try {
+        checkout = parseCheckoutSession(session);
+      } catch (err) {
+        console.error('Checkout session parsing failed:', err);
         return new Response('Missing metadata', { status: 400 });
       }
 
-      // Extract discount info from session
-      const discountAmount = session.total_details?.amount_discount
-        ? session.total_details.amount_discount / 100
-        : 0;
-
+      // Fetch discount code from Stripe API (side effect, stays in handler)
       let discountCode: string | null = null;
       if (session.discounts && session.discounts.length > 0) {
         const promoCodeId = session.discounts[0]?.promotion_code;
@@ -63,15 +58,15 @@ export const POST: APIRoute = async ({ request }) => {
         .from('orders')
         .upsert(
           {
-            event_id: eventId,
-            ticket_tier_id: tierId,
-            stripe_session_id: session.id,
-            stripe_payment_intent_id: session.payment_intent,
-            customer_email: session.customer_details?.email || session.customer_email,
-            customer_name: session.customer_details?.name,
-            quantity,
-            amount_paid: session.amount_total / 100, // Convert from cents
-            discount_amount: discountAmount,
+            event_id: checkout.eventId,
+            ticket_tier_id: checkout.tierId,
+            stripe_session_id: checkout.sessionId,
+            stripe_payment_intent_id: checkout.paymentIntentId,
+            customer_email: checkout.customerEmail,
+            customer_name: checkout.customerName,
+            quantity: checkout.quantity,
+            amount_paid: checkout.amountPaid,
+            discount_amount: checkout.discountAmount,
             discount_code: discountCode,
             status: 'completed',
           },
@@ -93,7 +88,7 @@ export const POST: APIRoute = async ({ request }) => {
       // Increment sold_count
       const { error: updateError } = await supabaseAdmin.rpc(
         'increment_sold_count',
-        { tier_id: tierId, qty: quantity }
+        { tier_id: checkout.tierId, qty: checkout.quantity }
       );
 
       // If RPC doesn't exist, do it manually
@@ -101,14 +96,14 @@ export const POST: APIRoute = async ({ request }) => {
         const { data: tier } = await supabaseAdmin
           .from('ticket_tiers')
           .select('sold_count')
-          .eq('id', tierId)
+          .eq('id', checkout.tierId)
           .single();
 
         if (tier) {
           await supabaseAdmin
             .from('ticket_tiers')
-            .update({ sold_count: tier.sold_count + quantity })
-            .eq('id', tierId);
+            .update({ sold_count: tier.sold_count + checkout.quantity })
+            .eq('id', checkout.tierId);
         }
       }
 
@@ -117,27 +112,27 @@ export const POST: APIRoute = async ({ request }) => {
         const { data: eventData } = await supabaseAdmin
           .from('events')
           .select('*')
-          .eq('id', eventId)
+          .eq('id', checkout.eventId)
           .single();
 
         const { data: tierData } = await supabaseAdmin
           .from('ticket_tiers')
           .select('name')
-          .eq('id', tierId)
+          .eq('id', checkout.tierId)
           .single();
 
-        if (eventData && tierData && session.customer_details?.email) {
+        if (eventData && tierData && checkout.customerEmail) {
           await sendTicketConfirmation({
-            to: session.customer_details.email,
-            customerName: session.customer_details.name,
+            to: checkout.customerEmail,
+            customerName: checkout.customerName,
             eventTitle: eventData.title,
             eventDate: new Date(eventData.date),
             eventTimezone: eventData.timezone,
             venueName: eventData.venue_name,
             venueAddress: eventData.venue_address,
             tierName: tierData.name,
-            quantity,
-            amountPaid: session.amount_total / 100,
+            quantity: checkout.quantity,
+            amountPaid: checkout.amountPaid,
             orderNumber,
           });
         }
@@ -152,36 +147,47 @@ export const POST: APIRoute = async ({ request }) => {
     // Handle charge.refunded
     if (event.type === 'charge.refunded') {
       const charge = event.data.object as any;
-      const paymentIntentId = charge.payment_intent;
-      const refundedAmount = charge.amount_refunded / 100; // Convert from cents
+
+      let refund;
+      try {
+        refund = parseRefundCharge(charge);
+      } catch (err) {
+        console.error('Refund charge parsing failed:', err);
+        return new Response('Missing payment intent', { status: 400 });
+      }
 
       // Find the order
       const { data: order, error: orderError } = await supabaseAdmin
         .from('orders')
         .select('*')
-        .eq('stripe_payment_intent_id', paymentIntentId)
+        .eq('stripe_payment_intent_id', refund.paymentIntentId)
         .single();
 
       if (orderError || !order) {
-        console.error('Order not found for refund:', paymentIntentId);
+        console.error('Order not found for refund:', refund.paymentIntentId);
         return new Response('Order not found', { status: 404 });
       }
 
       // Determine status
-      const isFullRefund = refundedAmount >= order.amount_paid;
+      const isFullRefund = refund.refundedAmount >= order.amount_paid;
       const newStatus = isFullRefund ? 'refunded' : 'partially_refunded';
 
       // Calculate tickets to return
+      // NOTE: Known issue — Stripe's amount_refunded is cumulative, but this code
+      // treats it as if each webhook is the first refund. On a second partial refund,
+      // ticketsToReturn will be recalculated from the cumulative total, potentially
+      // returning more tickets than intended. Fixing this requires tracking
+      // previously-returned tickets in the orders table.
       const ticketsToReturn = isFullRefund
         ? order.quantity
-        : Math.floor((refundedAmount / order.amount_paid) * order.quantity);
+        : Math.floor((refund.refundedAmount / order.amount_paid) * order.quantity);
 
       // Update order
       await supabaseAdmin
         .from('orders')
         .update({
           status: newStatus,
-          refunded_amount: refundedAmount,
+          refunded_amount: refund.refundedAmount,
         })
         .eq('id', order.id);
 
@@ -197,7 +203,7 @@ export const POST: APIRoute = async ({ request }) => {
           await supabaseAdmin
             .from('ticket_tiers')
             .update({
-              sold_count: Math.max(0, tier.sold_count - ticketsToReturn),
+              sold_count: clampSoldCount(tier.sold_count, ticketsToReturn),
             })
             .eq('id', order.ticket_tier_id);
         }
