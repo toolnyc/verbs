@@ -1,4 +1,16 @@
 /**
+ * Determine if an event has passed. Uses time_end if available,
+ * otherwise defaults to 6 hours after the start time.
+ */
+export function isEventPast(event: { date: string; time_end?: string | null }): boolean {
+  const startDate = new Date(event.date);
+  const endDate = event.time_end
+    ? new Date(event.time_end)
+    : new Date(startDate.getTime() + 6 * 60 * 60 * 1000);
+  return endDate < new Date();
+}
+
+/**
  * Sanitize a full address to show only street and city.
  * Takes addresses like "123 Main St, Brooklyn, Kings County, NY 11201, USA"
  * and returns "123 Main St, Brooklyn"

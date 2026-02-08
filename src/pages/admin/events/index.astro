@@ -66,7 +66,10 @@ const filters = [
     <div class="events-list">
       {events.map(event => {
         const stats = getTicketStats(event);
-        const isPast = new Date(event.date) < new Date();
+        const eventEnd = event.time_end
+          ? new Date(event.time_end)
+          : new Date(new Date(event.date).getTime() + 6 * 60 * 60 * 1000);
+        const isPast = eventEnd < new Date();
 
         return (
           <div class:list={['event-row', { past: isPast }]}>

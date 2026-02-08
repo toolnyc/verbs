@@ -5,6 +5,7 @@ import Footer from '../components/public/Footer.astro';
 import HouseRulesModal from '../components/public/HouseRulesModal.astro';
 import { getAllEvents, getPublishedEvents } from '../lib/supabase';
 import type { TicketTier } from '../lib/supabase';
+import { isEventPast } from '../lib/utils';
 
 // Check if user is authenticated
 const user = Astro.locals.user;
@@ -16,10 +17,9 @@ const events = user ? await getAllEvents() : await getPublishedEvents();
 // Sort descending so newest events appear first
 events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-// Find the next upcoming event (closest future date to today)
-const now = new Date();
+// Find the next upcoming event (event that hasn't ended yet)
 const upcomingEvents = events
-  .filter(e => new Date(e.date) >= now)
+  .filter(e => !isEventPast(e))
   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 const nextEventId = upcomingEvents.length > 0 ? upcomingEvents[0].id : null;
 const nextEventDate = upcomingEvents.length > 0 ? upcomingEvents[0].date : null;

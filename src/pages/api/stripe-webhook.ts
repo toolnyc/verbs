@@ -33,9 +33,10 @@ export const POST: APIRoute = async ({ request }) => {
       const eventId = session.metadata?.event_id;
       const tierId = session.metadata?.ticket_tier_id;
       const quantity = parseInt(session.metadata?.quantity || '1', 10);
+      const checkoutType = session.metadata?.checkout_type || 'online';
 
       if (!eventId || !tierId) {
-        console.error('Missing metadata in checkout session');
+        console.error('Missing metadata in checkout session:', session.id, 'metadata:', JSON.stringify(session.metadata));
         return new Response('Missing metadata', { status: 400 });
       }
 

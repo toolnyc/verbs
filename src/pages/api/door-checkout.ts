@@ -106,8 +106,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Check Stripe price ID exists
     if (!tier.stripe_price_id) {
+      console.error(`Door checkout failed: tier ${tier_id} missing stripe_price_id`);
       return new Response(
-        JSON.stringify({ error: 'Ticket not configured for purchase' }),
+        JSON.stringify({ error: 'Door ticket not configured for payment. Please contact the organizer.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -124,6 +125,7 @@ export const POST: APIRoute = async ({ request }) => {
       quantity,
       successUrl,
       cancelUrl,
+      checkoutType: 'door',
     });
 
     return new Response(

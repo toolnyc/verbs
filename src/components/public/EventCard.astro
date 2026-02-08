@@ -1,6 +1,6 @@
 ---
 import type { Event, TicketTier } from '../../lib/supabase';
-import { formatDisplayAddress } from '../../lib/utils';
+import { formatDisplayAddress, isEventPast } from '../../lib/utils';
 import TicketTierButton from './TicketTier.astro';
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 const { event, compact = false } = Astro.props;
 
 const eventDate = new Date(event.date);
-const isPast = eventDate < new Date();
+const isPast = isEventPast(event);
 
 const formattedDate = eventDate.toLocaleDateString('en-US', {
   weekday: 'short',

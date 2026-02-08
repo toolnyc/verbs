@@ -61,6 +61,7 @@ const formattedPrice = new Intl.NumberFormat('en-US', {
 
 const available = tier.max_stock !== null ? tier.max_stock - tier.sold_count : null;
 const isSoldOut = available !== null && available <= 0;
+const isNotConfigured = !tier.stripe_price_id;
 ---
 
 <Base title={`${event.title} - Door Checkout`} description={`Purchase tickets for ${event.title}`}>
@@ -69,7 +70,11 @@ const isSoldOut = available !== null && available <= 0;
       <h1 class="event-title">{event.title}</h1>
       {event.venue_name && <p class="event-venue text-muted">{event.venue_name}</p>}
 
-      {isSoldOut ? (
+      {isNotConfigured ? (
+        <div class="sold-out-message">
+          <p>Checkout is not available right now. Please pay at the door.</p>
+        </div>
+      ) : isSoldOut ? (
         <div class="sold-out-message">
           <p>Sorry, tickets are sold out.</p>
         </div>
@@ -329,7 +334,7 @@ const isSoldOut = available !== null && available <= 0;
       console.error('Checkout error:', err);
       payBtn.disabled = false;
       updateDisplay();
-      alert('Something went wrong. Please try again.');
+      alert(err.message || 'Something went wrong. Please try again.');
     }
   });
 </script>

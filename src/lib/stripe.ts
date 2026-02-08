@@ -14,6 +14,7 @@ export async function createCheckoutSession({
   customerEmail,
   successUrl,
   cancelUrl,
+  checkoutType = 'online',
 }: {
   priceId: string;
   eventId: string;
@@ -22,6 +23,7 @@ export async function createCheckoutSession({
   customerEmail?: string;
   successUrl: string;
   cancelUrl: string;
+  checkoutType?: 'online' | 'door';
 }) {
   if (!stripe) {
     throw new Error('Stripe not configured');
@@ -43,6 +45,7 @@ export async function createCheckoutSession({
       event_id: eventId,
       ticket_tier_id: tierId,
       quantity: quantity.toString(),
+      checkout_type: checkoutType,
     },
   });
 

@@ -4,7 +4,7 @@ import Footer from '../../components/public/Footer.astro';
 import TicketTier from '../../components/public/TicketTier.astro';
 import HouseRulesModal from '../../components/public/HouseRulesModal.astro';
 import { getEventWithDetails } from '../../lib/supabase';
-import { formatDisplayAddress } from '../../lib/utils';
+import { formatDisplayAddress, isEventPast } from '../../lib/utils';
 
 const { id } = Astro.params;
 
@@ -32,7 +32,7 @@ if (!canView) {
 const isDraft = event.status === 'draft';
 
 const eventDate = new Date(event.date);
-const isPast = eventDate < new Date();
+const isPast = isEventPast(event);
 
 const formattedDate = eventDate.toLocaleDateString('en-US', {
   weekday: 'long',
